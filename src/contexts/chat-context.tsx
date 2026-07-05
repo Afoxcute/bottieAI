@@ -8,13 +8,21 @@ import {
   useRef,
   type ReactNode,
 } from "react";
-import type { DashboardData } from "@/hooks/use-dashboard-data";
-
 export interface ActiveSheet {
   type: "deposit" | "withdraw" | "swap" | "goal";
   onConfirm: () => void;
   onCancel: () => void;
   step: "idle" | "processing" | "success" | "error";
+}
+
+// Generic financial context data passed to AI
+export interface FinancialData {
+  totalBillsDueUsd?: number;
+  portfolioValueUsd?: number;
+  billCount?: number;
+  walletBalanceUsd?: number;
+  totalSavingsUsd?: number;
+  hasPositions?: boolean;
 }
 
 interface ChatContextType {
@@ -23,8 +31,8 @@ interface ChatContextType {
   close: () => void;
   prefill: string | null;
   clearPrefill: () => void;
-  dashboardData: DashboardData | null;
-  registerDashboardData: (data: DashboardData) => void;
+  dashboardData: FinancialData | null;
+  registerDashboardData: (data: FinancialData) => void;
   sidebarOpen: boolean;
   openSidebar: () => void;
   closeSidebar: () => void;
@@ -47,7 +55,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const [activeSheet, setActiveSheet] = useState<ActiveSheet | null>(null);
   const [chatInput, setChatInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
-  const dataRef = useRef<DashboardData | null>(null);
+  const dataRef = useRef<FinancialData | null>(null);
   const sendRef = useRef<((text: string) => void) | null>(null);
 
   const open = useCallback((msg?: string) => {
@@ -60,7 +68,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const openSidebar = useCallback(() => setSidebarOpen(true), []);
   const closeSidebar = useCallback(() => setSidebarOpen(false), []);
 
-  const registerDashboardData = useCallback((data: DashboardData) => {
+  const registerDashboardData = useCallback((data: FinancialData) => {
     dataRef.current = data;
   }, []);
 

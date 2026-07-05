@@ -2,20 +2,17 @@
 
 import { usePrivy } from "@privy-io/react-auth";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChatProvider, useChatSheet } from "@/contexts/chat-context";
 import { GoalsProvider } from "@/contexts/goals-context";
 import { ChatSheet } from "@/components/chat/chat-sheet";
-import { useDashboardData } from "@/hooks/use-dashboard-data";
-import { useGoals } from "@/hooks/use-goals";
 import { useVoiceRecorder } from "@/hooks/use-voice-recorder";
 import { VoiceWaveform } from "@/components/chat/voice-waveform";
 import {
   SettingsSidebar,
   ScreenStackWrapper,
 } from "@/components/dashboard/settings-sidebar";
-import { LoadingScreen } from "@/components/ui/loading-screen";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { ready, authenticated } = usePrivy();
@@ -27,52 +24,27 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     }
   }, [ready, authenticated, router]);
 
-  if (!ready || !authenticated) {
-    return <LoadingScreen progress={25} />;
+  if (!ready) {
+    return (
+      <div className="flex min-h-dvh items-center justify-center bg-cream-dark">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-sage border-t-transparent" />
+      </div>
+    );
   }
+
+  if (!authenticated) return null;
 
   return (
     <ChatProvider>
-      <AppShell>{children}</AppShell>
+      <GoalsProvider value={{ goals: {}, refetch: async () => {} }}>
+        <AppShell>{children}</AppShell>
+      </GoalsProvider>
     </ChatProvider>
   );
 }
 
 function AppShell({ children }: { children: React.ReactNode }) {
   const { isOpen, sidebarOpen, openSidebar, closeSidebar } = useChatSheet();
-  const data = useDashboardData();
-  const { goals: rawGoals, isLoading: goalsLoading, refetch: refetchGoals } = useGoals();
-
-  const goalsMap = useMemo(
-    () => Object.fromEntries(
-      rawGoals.map((g) => [g.vaultId, { name: g.name, targetUsd: parseFloat(g.targetAmount) }])
-    ),
-    [rawGoals],
-  );
-
-  // Overlay pattern: mount app as soon as data is ready, loading screen fades out on top
-  // This eliminates the gap between loading screen disappearing and content appearing
-  const dataReady = !data.vaultsLoading && !goalsLoading;
-  const [appMounted, setAppMounted] = useState(dataReady);
-  const [overlayVisible, setOverlayVisible] = useState(!dataReady);
-  const handleLoadingExit = useCallback(() => setOverlayVisible(false), []);
-
-  // Mount app as soon as data is ready
-  useEffect(() => {
-    if (dataReady && !appMounted) setAppMounted(true);
-  }, [dataReady, appMounted]);
-
-  // Safety valve — never block longer than 6s
-  useEffect(() => {
-    const t = setTimeout(() => { setAppMounted(true); setOverlayVisible(false); }, 6000);
-    return () => clearTimeout(t);
-  }, []);
-
-  const loadingProgress =
-    !data.vaultsLoading && !goalsLoading ? 100 :
-    !data.vaultsLoading ? 70 :
-    !goalsLoading ? 40 :
-    15;
 
   // Lock body scroll when chat sheet or sidebar is open
   useEffect(() => {
@@ -87,41 +59,27 @@ function AppShell({ children }: { children: React.ReactNode }) {
   }, [isOpen, sidebarOpen]);
 
   return (
-    <GoalsProvider value={{ goals: goalsMap, refetch: refetchGoals }}>
-      {/* Loading overlay — sits on top while data loads, then fades away revealing app beneath */}
-      {overlayVisible && (
-        <LoadingScreen
-          progress={loadingProgress}
-          skipEntry
-          onExit={handleLoadingExit}
-        />
-      )}
+    <div className="relative min-h-dvh bg-cream-dark">
+      {/* Sidebar */}
+      <SettingsSidebar
+        open={sidebarOpen}
+        onClose={closeSidebar}
+        walletBalanceUsd={0}
+      />
 
-      {/* App content — mounts as soon as data is ready, stagger plays while overlay fades */}
-      {appMounted && (
-        <div className="relative min-h-dvh bg-cream-dark">
-          {/* Sidebar — dark full-screen bg, BEHIND the card */}
-          <SettingsSidebar
-            open={sidebarOpen}
-            onClose={closeSidebar}
-            walletBalanceUsd={data.walletBalanceUsd}
-          />
-
-          {/* Main content — floating card ON TOP, slides right to reveal sidebar */}
-          <ScreenStackWrapper open={sidebarOpen} onOpen={openSidebar} onClose={closeSidebar}>
-            <div className="flex min-h-dvh flex-col bg-cream-dark">
-              <main className="flex-1 overflow-y-auto pb-20">{children}</main>
-            </div>
-          </ScreenStackWrapper>
-
-          {/* Chat panel — always mounted, visibility controlled */}
-          <ChatSheet visible={isOpen} />
-
-          {/* Input bar — always visible except sidebar, z-60 above everything */}
-          {!sidebarOpen && <ChatInputBar />}
+      {/* Main content */}
+      <ScreenStackWrapper open={sidebarOpen} onOpen={openSidebar} onClose={closeSidebar}>
+        <div className="flex min-h-dvh flex-col bg-cream-dark">
+          <main className="flex-1 overflow-y-auto pb-20">{children}</main>
         </div>
-      )}
-    </GoalsProvider>
+      </ScreenStackWrapper>
+
+      {/* Chat panel */}
+      <ChatSheet visible={isOpen} />
+
+      {/* Input bar */}
+      {!sidebarOpen && <ChatInputBar />}
+    </div>
   );
 }
 
@@ -158,7 +116,6 @@ const CloseIcon = () => (
   </svg>
 );
 
-// Fixed pill height — matches the action button's natural height so all states are identical
 const PILL_INNER = "flex h-[66px] w-full items-center px-5";
 
 function ChatInputBar() {
@@ -222,7 +179,7 @@ function ChatInputBar() {
           if (!isOpen) open();
         }
       } catch {
-        // Silently fail — user can type instead
+        // Silently fail
       } finally {
         setIsTranscribing(false);
       }
@@ -231,7 +188,6 @@ function ChatInputBar() {
     }
   };
 
-  // Determine mode
   const mode = activeSheet ? "action"
     : isRecording ? "recording"
     : isTranscribing ? "transcribing"
@@ -292,7 +248,7 @@ function ChatInputBar() {
                   type="text"
                   value={chatInput}
                   onChange={(e) => setChatInput(e.target.value)}
-                  placeholder={voiceError ? "Mic unavailable — type instead" : "What are you saving for?"}
+                  placeholder={voiceError ? "Mic unavailable — type instead" : "Ask Bottie anything…"}
                   className="flex-1 bg-transparent font-body text-sm text-ink outline-none placeholder:text-ink-light/40"
                 />
                 <AnimatePresence mode="wait" initial={false}>
@@ -312,7 +268,7 @@ function ChatInputBar() {
             {mode === "idle" && (
               <motion.div key="idle" {...morphProps} className={`${PILL_INNER} gap-3`}>
                 <button onClick={() => open()} className="flex-1 text-left font-body text-sm text-ink-light/50">
-                  What are you saving for?
+                  Ask Bottie anything…
                 </button>
                 <button onClick={handleMicTap} className="rounded-full p-1">
                   <MicIcon className="text-ink-light/30" />

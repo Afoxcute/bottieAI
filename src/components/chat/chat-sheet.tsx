@@ -38,21 +38,12 @@ export function ChatSheet({ visible }: ChatSheetProps) {
   const bodyRef = useRef<Record<string, unknown>>({});
   bodyRef.current = {
     walletAddress,
-    walletBalanceUsd: dashboardData?.walletBalanceUsd,
-    totalSavingsUsd: dashboardData?.totalSavingsUsd,
     userName: name,
-    hasPositions: dashboardData?.hasPositions,
   };
 
   const transport = useMemo(() => {
     const liveBody: Record<string, unknown> = {};
-    for (const key of [
-      "walletAddress",
-      "walletBalanceUsd",
-      "totalSavingsUsd",
-      "userName",
-      "hasPositions",
-    ]) {
+    for (const key of ["walletAddress", "userName"]) {
       Object.defineProperty(liveBody, key, {
         get: () => bodyRef.current[key],
         enumerable: true,
@@ -163,7 +154,7 @@ export function ChatSheet({ visible }: ChatSheetProps) {
                   Hey{name ? `, ${name}` : ""}. 👋
                 </p>
                 <p className="mt-3 font-body text-[1rem] leading-relaxed text-ink/60">
-                  I&rsquo;m your savings assistant. Ask me what to save in, how much to set aside, or anything about your money.
+                  I&rsquo;m Bottie, your financial assistant. Ask me to pay your bills, invest in stocks, or check your portfolio.
                 </p>
               </div>
             )}

@@ -1,159 +1,139 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
-import { AnimatePresence } from "framer-motion";
-import type { VaultStatsItem } from "@yo-protocol/core";
-import { usePrivy, useFundWallet } from "@privy-io/react-auth";
-import { base } from "viem/chains";
-import { useDashboardData } from "@/hooks/use-dashboard-data";
-import { useActivities } from "@/hooks/use-activities";
-import { useAppGoals } from "@/contexts/goals-context";
+import { useState } from "react";
+import { usePrivy } from "@privy-io/react-auth";
 import { useChatSheet } from "@/contexts/chat-context";
-import { OverviewScreen } from "@/components/dashboard/overview-screen";
-import { DepositSheet } from "@/components/dashboard/deposit-sheet";
-import { WithdrawSheet } from "@/components/dashboard/withdraw-sheet";
-import { SendSheet } from "@/components/dashboard/send-sheet";
-import { ReceiveSheet } from "@/components/dashboard/receive-sheet";
+import { DemoStateProvider, useDemoState } from "@/contexts/demo-state-context";
+import { BillsScreen } from "@/components/dashboard/bills-screen";
+import { InvestmentsScreen } from "@/components/dashboard/investments-screen";
+import { PaymentsScreen } from "@/components/dashboard/payments-screen";
+import { DEMO_BILLS, DEMO_ASSETS, ASSET_PRICES } from "@/lib/demo-data";
 
-export default function DashboardPage() {
-  const data = useDashboardData();
-  const { activities, refetch: refetchActivities } = useActivities();
-  const { goals: goalsMap } = useAppGoals();
-  const { registerDashboardData, openSidebar } = useChatSheet();
-  const { user } = usePrivy();
-  const { fundWallet } = useFundWallet();
+type Tab = "bills" | "investments" | "payments" | "chat";
 
-  const walletAddress = user?.smartWallet?.address ?? user?.wallet?.address;
+const TABS: { key: Tab; label: string; icon: string }[] = [
+  { key: "bills",       label: "Bills",   icon: "🧾" },
+  { key: "investments", label: "Invest",  icon: "📈" },
+  { key: "payments",    label: "History", icon: "💳" },
+  { key: "chat",        label: "Chat",    icon: "💬" },
+];
 
-  useEffect(() => {
-    registerDashboardData(data);
-  }, [data, registerDashboardData]);
+function DashboardInner() {
+  const { openSidebar, open: openChat } = useChatSheet();
+  const [activeTab, setActiveTab] = useState<Tab>("bills");
+  const { paidBillIds, portfolio } = useDemoState();
 
-  const [depositVault, setDepositVault] = useState<VaultStatsItem | null>(null);
-  const [withdrawVault, setWithdrawVault] = useState<VaultStatsItem | null>(null);
-  const [sendOpen, setSendOpen] = useState(false);
-  const [receiveOpen, setReceiveOpen] = useState(false);
-
-  const handleTransactionSuccess = (clearSheet: () => void) => {
-    clearSheet();
-    setTimeout(() => refetchActivities(), 1500);
-    setTimeout(() => {
-      data.refetchPositions();
-      data.refetchBalances();
-    }, 4000);
+  const handleTabClick = (tab: Tab) => {
+    if (tab === "chat") {
+      openChat();
+    } else {
+      setActiveTab(tab);
+    }
   };
 
-  const handleDepositSuccess = () => handleTransactionSuccess(() => setDepositVault(null));
-  const handleWithdrawSuccess = () => handleTransactionSuccess(() => setWithdrawVault(null));
-  const handleSendSuccess = () => handleTransactionSuccess(() => setSendOpen(false));
-
-  const handleAddFunds = useCallback(() => {
-    if (walletAddress) fundWallet({
-      address: walletAddress,
-      options: {
-        chain: base,
-        asset: "USDC",
-        card: { preferredProvider: "moonpay" },
-      },
-    });
-  }, [walletAddress, fundWallet]);
-
-  const mappedActivities = useMemo(
-    () =>
-      activities.map((a) => ({
-        type: a.type as "deposit" | "withdraw" | "swap",
-        amount: a.amount,
-        tokenSymbol: a.tokenSymbol,
-        vaultId: a.vaultId ?? undefined,
-        txHash: a.txHash ?? undefined,
-        createdAt: a.createdAt,
-      })),
-    [activities],
+  const monthlyBills = DEMO_BILLS.filter((b) => paidBillIds.includes(b.id)).reduce(
+    (sum, b) => sum + b.amount,
+    0
   );
 
-  const withdrawPosition = withdrawVault
-    ? data.positions.find((p) => p.vault.id === withdrawVault.id)
-    : undefined;
+  const portfolioValue = portfolio.reduce(
+    (sum, p) => sum + p.shares * (ASSET_PRICES[p.symbol] ?? p.avgPriceUsd),
+    0
+  );
+
+  const pendingCount = DEMO_BILLS.length - paidBillIds.length;
 
   return (
-    <div className="relative">
+    <div className="relative min-h-dvh">
       {/* Header */}
-      <div className="fixed top-0 right-0 left-0 z-30 flex items-center justify-between px-5 pt-[max(env(safe-area-inset-top),12px)] pb-2">
+      <div className="fixed top-0 right-0 left-0 z-30 flex items-center justify-between px-5 pt-[max(env(safe-area-inset-top),12px)] pb-3 bg-cream-dark/80 backdrop-blur-sm">
         <button
           onClick={openSidebar}
           className="rounded-full p-2 transition-colors duration-200 hover:bg-ink/[0.04]"
+          aria-label="Open settings"
         >
           <svg width="20" height="20" viewBox="0 0 20 20" fill="none" className="text-ink-light">
             <path d="M3 5h14M3 10h14M3 15h14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
           </svg>
         </button>
+
+        <div className="text-center">
+          <p className="text-xs font-medium text-ink-light/50 uppercase tracking-wide">Bottie</p>
+        </div>
+
+        <button
+          onClick={() => openChat()}
+          className="rounded-full p-2 transition-colors duration-200 hover:bg-ink/[0.04]"
+          aria-label="Open chat"
+        >
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" className="text-ink-light">
+            <path
+              d="M18 10c0 4.418-3.582 8-8 8a7.96 7.96 0 01-4-.107L2 19l1.107-4A7.96 7.96 0 012 10C2 5.582 5.582 2 10 2s8 3.582 8 8z"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </button>
       </div>
 
-      <OverviewScreen
-        data={data}
-        activities={mappedActivities}
-        goals={goalsMap}
-        onVaultTap={setDepositVault}
-        onPositionTap={setWithdrawVault}
-        onAddFunds={handleAddFunds}
-        onSend={() => setSendOpen(true)}
-        onReceive={() => setReceiveOpen(true)}
-        onRefresh={async () => {
-          await Promise.all([
-            data.refetchPositions(),
-            data.refetchBalances(),
-            refetchActivities(),
-          ]);
-        }}
-      />
+      {/* Summary strip */}
+      <div className="mt-[calc(env(safe-area-inset-top)+56px)] px-5 pb-2 pt-2">
+        <div className="flex gap-3">
+          <div className="flex-1 rounded-2xl bg-[#1B1C19] border border-[#2A2B27] p-4">
+            <p className="text-xs text-[#A7A79A] font-medium">Monthly Bills</p>
+            <p className="text-xl font-bold text-[#F2F0E8] mt-0.5">
+              ${monthlyBills.toFixed(2)}
+            </p>
+            {pendingCount > 0 && (
+              <p className="text-xs text-amber-400 mt-0.5">{pendingCount} not subscribed</p>
+            )}
+          </div>
+          <div className="flex-1 rounded-2xl bg-[#1B1C19] border border-[#2A2B27] p-4">
+            <p className="text-xs text-[#A7A79A] font-medium">Portfolio</p>
+            <p className="text-xl font-bold text-[#F2F0E8] mt-0.5">
+              ${portfolioValue.toFixed(2)}
+            </p>
+            <p className="text-xs text-green-400 mt-0.5">
+              {portfolio.length} position{portfolio.length !== 1 ? "s" : ""}
+            </p>
+          </div>
+        </div>
+      </div>
 
-      {/* Sheets */}
-      <AnimatePresence>
-        {depositVault && (
-          <DepositSheet
-            key="deposit"
-            vault={depositVault}
-            prices={data.prices}
-            walletAssets={data.walletAssets}
-            onClose={() => setDepositVault(null)}
-            onSuccess={handleDepositSuccess}
-          />
-        )}
-      </AnimatePresence>
+      {/* Tab navigation */}
+      <div className="sticky top-[calc(env(safe-area-inset-top)+56px)] z-20 flex gap-1 bg-cream-dark/90 backdrop-blur-sm px-5 py-2 border-b border-[#2A2B27]">
+        {TABS.filter((t) => t.key !== "chat").map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => handleTabClick(tab.key)}
+            className={`flex-1 flex flex-col items-center gap-0.5 rounded-xl py-2 transition-colors ${
+              activeTab === tab.key
+                ? "bg-[#F2F0E8] text-[#141513]"
+                : "text-[#A7A79A] hover:bg-white/[0.04]"
+            }`}
+          >
+            <span className="text-base">{tab.icon}</span>
+            <span className="text-[10px] font-medium">{tab.label}</span>
+          </button>
+        ))}
+      </div>
 
-      <AnimatePresence>
-        {withdrawVault && withdrawPosition && (
-          <WithdrawSheet
-            key="withdraw"
-            vault={withdrawVault}
-            position={withdrawPosition.position}
-            prices={data.prices}
-            onClose={() => setWithdrawVault(null)}
-            onSuccess={handleWithdrawSuccess}
-          />
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {sendOpen && (
-          <SendSheet
-            key="send"
-            walletBalanceUsd={data.walletBalanceUsd}
-            walletAssets={data.walletAssets}
-            onClose={() => setSendOpen(false)}
-            onSuccess={handleSendSuccess}
-          />
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {receiveOpen && (
-          <ReceiveSheet
-            key="receive"
-            onClose={() => setReceiveOpen(false)}
-          />
-        )}
-      </AnimatePresence>
+      {/* Content */}
+      <div className="px-5 py-4">
+        {activeTab === "bills"       && <BillsScreen />}
+        {activeTab === "investments" && <InvestmentsScreen />}
+        {activeTab === "payments"    && <PaymentsScreen />}
+      </div>
     </div>
+  );
+}
+
+export default function DashboardPage() {
+  return (
+    <DemoStateProvider>
+      <DashboardInner />
+    </DemoStateProvider>
   );
 }

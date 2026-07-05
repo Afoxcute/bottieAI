@@ -24,17 +24,17 @@ export async function POST(req: Request) {
   const {
     messages,
     walletAddress,
-    walletBalanceUsd,
-    totalSavingsUsd,
     userName,
-    hasPositions,
+    totalBillsDueUsd,
+    portfolioValueUsd,
+    billCount,
   } = body as {
     messages: UIMessage[];
     walletAddress?: string;
-    walletBalanceUsd?: number;
-    totalSavingsUsd?: number;
     userName?: string;
-    hasPositions?: boolean;
+    totalBillsDueUsd?: number;
+    portfolioValueUsd?: number;
+    billCount?: number;
   };
 
   const tools = createTools(walletAddress, userId);
@@ -46,9 +46,9 @@ export async function POST(req: Request) {
     system: buildSystemPrompt({
       userName,
       walletAddress,
-      walletBalanceUsd,
-      totalSavingsUsd,
-      hasPositions,
+      totalBillsDueUsd,
+      portfolioValueUsd,
+      billCount,
       conversationRecap: recap || undefined,
     }),
     messages: await convertToModelMessages(windowed),
