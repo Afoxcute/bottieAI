@@ -79,7 +79,6 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const sendMessage = useCallback((text: string) => {
     if (sendRef.current && text.trim()) {
       sendRef.current(text);
-      setChatInput("");
     }
   }, []);
 

@@ -67,14 +67,14 @@ export function ChatSheet({ visible }: ChatSheetProps) {
   const handleSend = useCallback(
     (text: string) => {
       if (!text.trim() || isBusy) return;
-      userScrolledRef.current = false; // reset on new send
+      userScrolledRef.current = false;
       sendMessage({ text });
-      // Scroll to bottom after send
+      setChatInput("");
       requestAnimationFrame(() => {
         scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
       });
     },
-    [isBusy, sendMessage],
+    [isBusy, sendMessage, setChatInput],
   );
 
   useEffect(() => {
@@ -163,7 +163,7 @@ export function ChatSheet({ visible }: ChatSheetProps) {
                 (p) => p.type === "text" && p.text.trim(),
               );
               const hasActionToolParts = message.parts.some(
-                (p) => p.type.startsWith("tool-") && ["deposit", "withdraw", "swap", "swap_and_deposit"].includes(p.type.slice(5)),
+                (p) => p.type.startsWith("tool-"),
               );
 
               return (
@@ -200,7 +200,7 @@ export function ChatSheet({ visible }: ChatSheetProps) {
                         );
                       }
 
-                      if (tp.state === "result" && tp.output) {
+                      if (tp.state === "output-available" && tp.output) {
                         return (
                           <ToolResultCard key={tp.toolCallId} toolName={toolName} result={tp.output} />
                         );

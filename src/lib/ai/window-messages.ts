@@ -1,15 +1,14 @@
 import type { UIMessage } from "ai";
-import { VAULT_FRIENDLY_NAMES } from "@/lib/constants";
 
 const RECENT_WINDOW = 20;
 const MAX_RECAP_LINES = 30;
 
 const ACTION_TOOLS = new Set([
-  "deposit",
-  "withdraw",
-  "swap",
-  "swap_and_deposit",
-  "create_goal",
+  "pay_bill",
+  "buy_investment",
+  "nanopay_pay",
+  "nanopay_deposit",
+  "nanopay_withdraw",
 ]);
 
 interface ToolPart {
@@ -34,28 +33,30 @@ function formatActionFact(toolName: string, input: Record<string, string>, outpu
   let line: string;
 
   switch (toolName) {
-    case "deposit":
-      line = cancelled
-        ? `User cancelled deposit of ${input.amount} ${input.tokenSymbol}`
-        : `Saved ${input.amount} ${input.tokenSymbol} into ${VAULT_FRIENDLY_NAMES[input.vaultId] || input.vaultId}`;
+    case "pay_bill":
+      line = (parsed as any)?.success
+        ? `Paid ${input.billName ?? input.billId} — $${(parsed as any)?.bill?.amount ?? "?"} USDC`
+        : `Failed to pay ${input.billName ?? input.billId}`;
       break;
-    case "withdraw":
-      line = cancelled
-        ? `User cancelled withdrawal of ${input.amount} ${input.tokenSymbol}`
-        : `Withdrew ${input.amount} ${input.tokenSymbol} from ${VAULT_FRIENDLY_NAMES[input.vaultId] || input.vaultId}`;
+    case "buy_investment":
+      line = (parsed as any)?.success
+        ? `Bought ${input.shares} shares of ${input.symbol} for $${(parsed as any)?.totalUsdc ?? "?"} USDC`
+        : `Failed to buy ${input.symbol}`;
       break;
-    case "swap":
-      line = cancelled
-        ? `User cancelled swap of ${input.sellAmount} ${input.sellToken}`
-        : `Swapped ${input.sellAmount} ${input.sellToken} to ${input.buyToken}`;
+    case "nanopay_pay":
+      line = (parsed as any)?.status === "success"
+        ? `Paid x402 resource: ${input.url}`
+        : `Nanopayment failed for: ${input.url}`;
       break;
-    case "swap_and_deposit":
-      line = cancelled
-        ? `User cancelled swap+deposit of ${input.sellAmount} ${input.sellToken}`
-        : `Swapped ${input.sellAmount} ${input.sellToken} and saved in ${VAULT_FRIENDLY_NAMES[input.vaultId] || input.vaultId}`;
+    case "nanopay_deposit":
+      line = (parsed as any)?.depositTxHash
+        ? `Deposited ${input.amount} USDC into Gateway`
+        : ((parsed as any)?.skipped ? `Gateway deposit skipped — balance sufficient` : `Gateway deposit failed`);
       break;
-    case "create_goal":
-      line = `Set goal '${input.name}' — ${input.targetAmount} ${input.currency} in ${VAULT_FRIENDLY_NAMES[input.vaultId] || input.vaultId}`;
+    case "nanopay_withdraw":
+      line = (parsed as any)?.mintTxHash
+        ? `Withdrew ${input.amount} USDC from Gateway`
+        : `Gateway withdrawal failed`;
       break;
     default:
       return "";

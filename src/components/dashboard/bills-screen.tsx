@@ -65,7 +65,7 @@ function BillCard({ bill, paid, onSubscribe }: BillCardProps) {
 
 export function BillsScreen() {
   const { isBillPaid, markBillPaid, paidBillIds } = useDemoState();
-  const { openSidebar, sendMessage } = useChatSheet();
+  const { open: openChat, sendMessage } = useChatSheet();
   const [activeTab, setActiveTab] = useState<string>("all");
   const [payingBill, setPayingBill] = useState<DemoBill | null>(null);
 
@@ -100,7 +100,7 @@ export function BillsScreen() {
         <button
           onClick={() => {
             sendMessage("Show me my active subscriptions and bills");
-            openSidebar();
+            openChat();
           }}
           className="mt-4 rounded-xl bg-[#141513]/20 px-4 py-2 text-sm font-semibold text-[#141513]"
         >

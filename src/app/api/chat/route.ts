@@ -37,6 +37,10 @@ export async function POST(req: Request) {
     billCount?: number;
   };
 
+  if (!Array.isArray(messages)) {
+    return new Response("messages must be an array", { status: 400 });
+  }
+
   const tools = createTools(walletAddress, userId);
   const recap = extractConversationRecap(messages);
   const windowed = windowMessages(messages);

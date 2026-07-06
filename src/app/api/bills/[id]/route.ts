@@ -60,7 +60,7 @@ export async function PATCH(
     const [updated] = await db
       .update(bills)
       .set(updateFields)
-      .where(eq(bills.id, id))
+      .where(and(eq(bills.id, id), eq(bills.userId, userId)))
       .returning();
 
     return NextResponse.json({ bill: updated });
@@ -94,7 +94,7 @@ export async function DELETE(
       return NextResponse.json({ error: "Bill not found" }, { status: 404 });
     }
 
-    await db.delete(bills).where(eq(bills.id, id));
+    await db.delete(bills).where(and(eq(bills.id, id), eq(bills.userId, userId)));
 
     return NextResponse.json({ success: true });
   } catch (err) {

@@ -77,6 +77,8 @@ export function PaymentModal({
   }, [isConfirmed, txHash, onSuccess]);
 
   const handlePay = async () => {
+    // Prevent double-submit — isBusy state may not have re-rendered yet
+    if (arcPending || isPending || isConfirming) return;
     setArcError(null);
 
     if (browserProvider) {
@@ -90,6 +92,9 @@ export function PaymentModal({
           amount: amount.toFixed(6),
           token: "USDC",
         });
+        if ((result as any)?.state && (result as any).state !== "success") {
+          throw new Error("Transfer did not complete");
+        }
         const hash =
           (result as any)?.hash ??
           (result as any)?.transactionHash ??

@@ -13,7 +13,9 @@ export function useUsdcBalance(address: `0x${string}` | undefined) {
   });
 
   const balance = data ? Number(data.formatted) : 0;
-  const isLow = !isLoading && balance < LOW_BALANCE_THRESHOLD_USD;
+  // Only flag low balance when the wallet has been used (balance > 0) but is running low,
+  // so new users with 0 USDC don't see the warning immediately on first login.
+  const isLow = !isLoading && balance > 0 && balance < LOW_BALANCE_THRESHOLD_USD;
   const formatted = `$${balance.toFixed(2)}`;
 
   return { balance, formatted, isLow, isLoading, refetch };

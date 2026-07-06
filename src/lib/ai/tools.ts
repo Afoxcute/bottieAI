@@ -42,10 +42,12 @@ export function createTools(walletAddress?: string, userId?: string) {
       inputSchema: z.object({
         billName: z
           .string()
+          .max(256)
           .optional()
           .describe("Bill name to pay, e.g. 'Netflix', 'Spotify', 'AT&T Fiber'"),
         billId: z
           .string()
+          .max(64)
           .optional()
           .describe("Bill ID to pay (use the id from get_bills)"),
       }),
@@ -138,9 +140,11 @@ export function createTools(walletAddress?: string, userId?: string) {
       inputSchema: z.object({
         symbol: z
           .string()
+          .max(16)
           .describe("Ticker symbol to buy, e.g. AAPL, TSLA, SPACEX, SPY"),
         shares: z
           .string()
+          .max(32)
           .describe("Number of shares to buy, e.g. '1', '0.5', '2'"),
       }),
       execute: async ({ symbol, shares }) => {
@@ -285,10 +289,23 @@ export function createTools(walletAddress?: string, userId?: string) {
         "Check the agent's Circle Gateway nanopayments balance on Base Sepolia — both the wallet USDC balance and the spendable Gateway balance for gas-free payments.",
       inputSchema: z.object({}),
       execute: async () => {
-        const base = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-        const res = await fetch(`${base}/api/nanopay/balance`);
-        if (!res.ok) return { error: "Failed to fetch nanopay balance" };
-        return res.json();
+        if (!process.env.CIRCLE_BUYER_PRIVATE_KEY)
+          return { error: "CIRCLE_BUYER_PRIVATE_KEY not configured" };
+        try {
+          const { getBuyerClient } = await import("@/lib/circle-gateway");
+          const client = getBuyerClient();
+          const balances = await client.getBalances();
+          return {
+            address: client.address,
+            wallet: { usdc: balances.wallet.formatted },
+            gateway: {
+              available: balances.gateway.formattedAvailable,
+              total: balances.gateway.formattedTotal,
+            },
+          };
+        } catch (err: any) {
+          return { error: err?.message ?? "Failed to fetch balances" };
+        }
       },
     }),
 
@@ -301,17 +318,31 @@ export function createTools(walletAddress?: string, userId?: string) {
           .describe("Amount of USDC to deposit, e.g. '1' for 1 USDC"),
       }),
       execute: async ({ amount }) => {
-        const base = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-        const res = await fetch(`${base}/api/nanopay/deposit`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ amount }),
-        });
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          return { error: (err as any).error ?? "Deposit failed" };
+        if (!process.env.CIRCLE_BUYER_PRIVATE_KEY)
+          return { error: "CIRCLE_BUYER_PRIVATE_KEY not configured" };
+        const amountNum = Number(amount);
+        if (isNaN(amountNum) || amountNum <= 0)
+          return { error: "amount must be a positive number" };
+        try {
+          const { getBuyerClient } = await import("@/lib/circle-gateway");
+          const client = getBuyerClient();
+          const balances = await client.getBalances();
+          const needed = BigInt(Math.round(amountNum * 1_000_000));
+          if (balances.gateway.available >= needed) {
+            return {
+              skipped: true,
+              message: "Gateway balance already sufficient",
+              gateway: { available: balances.gateway.formattedAvailable },
+            };
+          }
+          const result = await client.deposit(String(amount));
+          return {
+            depositTxHash: result.depositTxHash,
+            amount: result.formattedAmount,
+          };
+        } catch (err: any) {
+          return { error: err?.message ?? "Deposit failed" };
         }
-        return res.json();
       },
     }),
 
@@ -325,17 +356,19 @@ export function createTools(walletAddress?: string, userId?: string) {
           .describe("The URL of the x402-protected resource to pay for"),
       }),
       execute: async ({ url }) => {
-        const base = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-        const res = await fetch(`${base}/api/nanopay/pay`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ url }),
-        });
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          return { error: (err as any).error ?? "Payment failed" };
+        if (!process.env.CIRCLE_BUYER_PRIVATE_KEY)
+          return { error: "CIRCLE_BUYER_PRIVATE_KEY not configured" };
+        try {
+          const { getBuyerClient } = await import("@/lib/circle-gateway");
+          const client = getBuyerClient();
+          const support = await client.supports(url);
+          if (!support.supported)
+            return { error: "Target URL does not support Circle Gateway nanopayments" };
+          const { data, status, formattedAmount, transaction } = await client.pay(url);
+          return { status, data, paid: formattedAmount, transaction };
+        } catch (err: any) {
+          return { error: err?.message ?? "Payment failed" };
         }
-        return res.json();
       },
     }),
 
@@ -348,17 +381,23 @@ export function createTools(walletAddress?: string, userId?: string) {
           .describe("Amount of USDC to withdraw, e.g. '0.5' for 0.5 USDC"),
       }),
       execute: async ({ amount }) => {
-        const base = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-        const res = await fetch(`${base}/api/nanopay/withdraw`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ amount }),
-        });
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          return { error: (err as any).error ?? "Withdrawal failed" };
+        if (!process.env.CIRCLE_BUYER_PRIVATE_KEY)
+          return { error: "CIRCLE_BUYER_PRIVATE_KEY not configured" };
+        const amountNum = Number(amount);
+        if (isNaN(amountNum) || amountNum <= 0)
+          return { error: "amount must be a positive number" };
+        try {
+          const { getBuyerClient } = await import("@/lib/circle-gateway");
+          const client = getBuyerClient();
+          const result = await client.withdraw(String(amount));
+          return {
+            mintTxHash: result.mintTxHash,
+            amount: result.formattedAmount,
+            chain: result.destinationChain,
+          };
+        } catch (err: any) {
+          return { error: err?.message ?? "Withdrawal failed" };
         }
-        return res.json();
       },
     }),
   };

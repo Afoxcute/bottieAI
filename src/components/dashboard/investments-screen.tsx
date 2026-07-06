@@ -146,7 +146,7 @@ function BuySheet({ asset, onClose, onConfirm }: BuySheetProps) {
 
 export function InvestmentsScreen() {
   const { portfolio, buyAsset } = useDemoState();
-  const { openSidebar, sendMessage } = useChatSheet();
+  const { open: openChat, sendMessage } = useChatSheet();
   const [viewTab, setViewTab] = useState<"portfolio" | "market">("portfolio");
   const [marketFilter, setMarketFilter] = useState<string>("all");
   const [buyingAsset, setBuyingAsset] = useState<DemoAsset | null>(null);
@@ -187,7 +187,7 @@ export function InvestmentsScreen() {
         <button
           onClick={() => {
             sendMessage("What should I invest in? Show me my portfolio.");
-            openSidebar();
+            openChat();
           }}
           className="mt-4 rounded-xl bg-[#141513]/20 px-4 py-2 text-sm font-semibold text-[#141513]"
         >

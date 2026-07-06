@@ -10,8 +10,8 @@ export async function POST(req: Request) {
   }
 
   const { amount } = await req.json().catch(() => ({ amount: null }));
-  if (!amount || isNaN(Number(amount))) {
-    return NextResponse.json({ error: "amount is required" }, { status: 400 });
+  if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
+    return NextResponse.json({ error: "amount must be a positive number" }, { status: 400 });
   }
 
   try {

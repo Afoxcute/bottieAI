@@ -26,17 +26,17 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Bottie — Onchain Savings Made Easy",
+  title: "Bottie — Your AI Finance Assistant",
   description:
-    "Earn up to 12% on your savings. No fees. Withdraw anytime. Powered by YO Protocol.",
+    "Pay bills, invest in assets, and manage your finances with an AI assistant. Powered by Circle and Arc.",
   manifest: "/manifest.json",
   icons: {
     icon: "/Bottie.jpg",
     apple: "/Bottie.jpg",
   },
   openGraph: {
-    title: "Bottie — Onchain Savings Made Easy",
-    description: "Earn up to 12% on your savings. No fees. Withdraw anytime.",
+    title: "Bottie — Your AI Finance Assistant",
+    description: "Pay bills, invest in assets, and manage your finances with an AI assistant.",
     type: "website",
   },
   appleWebApp: {

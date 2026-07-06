@@ -13,6 +13,8 @@ import {
   SettingsSidebar,
   ScreenStackWrapper,
 } from "@/components/dashboard/settings-sidebar";
+import { useAccount } from "wagmi";
+import { useUsdcBalance } from "@/hooks/use-usdc-balance";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { ready, authenticated } = usePrivy();
@@ -45,6 +47,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
 function AppShell({ children }: { children: React.ReactNode }) {
   const { isOpen, sidebarOpen, openSidebar, closeSidebar } = useChatSheet();
+  const { address } = useAccount();
+  const { balance } = useUsdcBalance(address);
 
   // Lock body scroll when chat sheet or sidebar is open
   useEffect(() => {
@@ -64,7 +68,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
       <SettingsSidebar
         open={sidebarOpen}
         onClose={closeSidebar}
-        walletBalanceUsd={0}
+        walletBalanceUsd={balance}
       />
 
       {/* Main content */}

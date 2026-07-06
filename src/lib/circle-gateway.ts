@@ -94,9 +94,15 @@ export async function settlePayment(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   requirements: any,
 ): Promise<{ success: boolean; payer?: string; transaction?: string; errorReason?: string }> {
+  let payload: unknown;
+  try {
+    payload = JSON.parse(
+      Buffer.from(paymentSignatureHeader, "base64").toString("utf8"),
+    );
+  } catch {
+    return { success: false, errorReason: "Malformed payment signature header" };
+  }
   const facilitator = getFacilitatorClient();
-  const payload = JSON.parse(
-    Buffer.from(paymentSignatureHeader, "base64").toString("utf8"),
-  );
-  return facilitator.settle(payload, requirements);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return facilitator.settle(payload as any, requirements);
 }

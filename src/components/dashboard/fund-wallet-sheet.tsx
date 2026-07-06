@@ -189,7 +189,7 @@ function SendTab({ agentAddress }: { agentAddress: string }) {
   const [txState, setTxState] = useState<TxState>({ status: "idle" });
 
   const handleSend = async () => {
-    if (!connected || !amount || Number(amount) <= 0) return;
+    if (!connected || !amount || Number(amount) <= 0 || txState.status === "pending") return;
     setTxState({ status: "pending", label: "Preparing transfer…" });
     try {
       const adapter = await createViemAdapterFromProvider({
@@ -306,7 +306,7 @@ function BridgeTab({ agentAddress }: { agentAddress: string }) {
   const selectedSource = BRIDGE_SOURCE_OPTIONS.find((o) => o.value === sourceChain)!;
 
   const handleBridge = async () => {
-    if (!connected || !amount || Number(amount) <= 0) return;
+    if (!connected || !amount || Number(amount) <= 0 || txState.status === "pending") return;
     setTxState({ status: "pending", label: "Preparing bridge…" });
     try {
       const adapter = await createViemAdapterFromProvider({

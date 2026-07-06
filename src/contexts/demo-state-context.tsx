@@ -56,7 +56,16 @@ function load(): State {
   if (typeof window === "undefined") return DEFAULT;
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return { ...DEFAULT, ...JSON.parse(raw) };
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (typeof parsed === "object" && parsed !== null) {
+        return {
+          paidBillIds: Array.isArray(parsed.paidBillIds) ? parsed.paidBillIds : [],
+          portfolio:   Array.isArray(parsed.portfolio)   ? parsed.portfolio   : [],
+          payments:    Array.isArray(parsed.payments)    ? parsed.payments    : [],
+        };
+      }
+    }
   } catch {}
   return DEFAULT;
 }
