@@ -495,7 +495,7 @@ export function FundWalletSheet({ agentAddress, onClose }: FundWalletSheetProps)
   const [tab, setTab] = useState<"send" | "bridge">("send");
 
   const sheet = (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/60 backdrop-blur-sm">
       <div className="w-full max-w-lg rounded-t-3xl bg-[#1B1C19] border-t border-[#2A2B27] flex flex-col max-h-[90dvh]">
         {/* Header */}
         <div className="flex items-center justify-between px-6 pt-6 pb-4">

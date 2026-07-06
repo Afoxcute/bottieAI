@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { DEMO_ASSETS, ASSET_PRICES, type DemoAsset } from "@/lib/demo-data";
 import { useDemoState, type PortfolioPosition } from "@/contexts/demo-state-context";
 import { PaymentModal } from "./payment-modal";
@@ -80,8 +81,8 @@ function BuySheet({ asset, onClose, onConfirm }: BuySheetProps) {
     );
   }
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm">
+  return createPortal(
+    <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/60 backdrop-blur-sm">
       <div className="w-full max-w-lg rounded-t-3xl bg-[#1B1C19] p-6 pb-10 border-t border-[#2A2B27]">
         <div className="mb-5 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -140,7 +141,8 @@ function BuySheet({ asset, onClose, onConfirm }: BuySheetProps) {
           Review & Invest
         </button>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 

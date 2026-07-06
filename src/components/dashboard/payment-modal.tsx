@@ -132,7 +132,7 @@ export function PaymentModal({
       : null);
 
   const modal = (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/60 backdrop-blur-sm">
       <div className="w-full max-w-lg rounded-t-3xl bg-[#1B1C19] p-6 pb-10 border-t border-[#2A2B27]">
         {/* Header */}
         <div className="mb-5 flex items-center justify-between">
