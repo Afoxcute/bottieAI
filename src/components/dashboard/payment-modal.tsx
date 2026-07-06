@@ -93,6 +93,7 @@ export function PaymentModal({
           `arc-${Date.now()}`;
         onSuccess(hash);
       } catch (err: any) {
+        console.error("[PaymentModal] arcKit.send failed:", err);
         const msg = (err?.message ?? "").toLowerCase();
         setArcError(
           msg.includes("reject") || msg.includes("cancel") || msg.includes("denied")
