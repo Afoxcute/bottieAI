@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { useWallets } from "@privy-io/react-auth";
 import { arcKit, AGENT_CHAIN } from "@/lib/arc-kit";
 import { createViemAdapterFromProvider } from "@circle-fin/adapter-viem-v2";
@@ -130,7 +131,7 @@ export function PaymentModal({
         : "Payment could not be processed. Please try again."
       : null);
 
-  return (
+  const modal = (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm">
       <div className="w-full max-w-lg rounded-t-3xl bg-[#1B1C19] p-6 pb-10 border-t border-[#2A2B27]">
         {/* Header */}
@@ -189,4 +190,6 @@ export function PaymentModal({
       </div>
     </div>
   );
+
+  return createPortal(modal, document.body);
 }
