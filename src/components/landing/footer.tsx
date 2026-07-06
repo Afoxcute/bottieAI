@@ -34,7 +34,7 @@ export function Footer() {
             transition={{ delay: 0.15, duration: 0.7, ease }}
             className="mt-3 font-display text-[clamp(2.5rem,11vw,3.5rem)] leading-tight tracking-tight text-ink text-balance"
           >
-            Start saving today.
+            Get started today.
           </motion.p>
         </div>
 
@@ -72,7 +72,7 @@ export function Footer() {
         className="absolute inset-x-0 bottom-8 flex flex-col items-center gap-1.5"
       >
         <span className="font-mono text-[11px] tracking-[0.1em] text-ink-light/40">
-          built by s0nderlabs
+          built with Bottie
         </span>
       </motion.div>
     </footer>
