@@ -18,7 +18,7 @@ Bottie is a mobile-first AI financial assistant that lets you manage recurring s
 
 ## Features
 
-- **AI agent** — Chat with DeepSeek via Vercel AI SDK. Agent can list bills, pay subscriptions, buy investments, check nanopay balance, deposit/withdraw from Circle Gateway, and pay x402-protected URLs.
+- **AI agent** — Chat with OpenAI via Vercel AI SDK. Agent can list bills, pay subscriptions, buy investments, check nanopay balance, deposit/withdraw from Circle Gateway, and pay x402-protected URLs.
 - **Arc AppKit Send** — Fund the agent wallet by sending USDC from any EIP-6963 browser wallet (MetaMask, Coinbase Wallet, etc.) on Base Sepolia.
 - **Arc AppKit Bridge** — Bridge USDC from 8 source testnets (Arc Testnet, Ethereum Sepolia, Arbitrum Sepolia, Optimism Sepolia, Avalanche Fuji, Polygon Amoy, Linea Sepolia, Base Sepolia) into the agent wallet.
 - **Arc AppKit Send in payment modal** — Bill and investment payments route through `arcKit.send()` when a browser wallet is present; wagmi `writeContract` fallback for embedded-wallet-only users.
@@ -127,7 +127,7 @@ await arcKit.bridge({
 |-------|-----------|
 | Framework | Next.js 15, React 19, TypeScript |
 | Styling | Tailwind CSS v4 |
-| AI | Vercel AI SDK v5, DeepSeek Chat, OpenAI Whisper |
+| AI | Vercel AI SDK v5, OpenAI (chat + Whisper) |
 | Auth | Privy (EOA embedded wallets) |
 | Onchain | wagmi v2, viem |
 | Arc AppKit | `@circle-fin/app-kit`, `@circle-fin/adapter-viem-v2` |
@@ -221,8 +221,7 @@ cp .env.example .env
 | `PRIVY_APP_SECRET` | Yes | Privy app secret (server-only) | [console.privy.io](https://console.privy.io) |
 | `NEXT_PUBLIC_ALCHEMY_API_KEY` | Yes | Alchemy RPC key for Base Sepolia | [dashboard.alchemy.com](https://dashboard.alchemy.com) |
 | `DATABASE_URL` | Yes | Neon Postgres connection string | [neon.tech](https://neon.tech) |
-| `DEEPSEEK_API_KEY` | Yes | DeepSeek API key for AI chat | [platform.deepseek.com](https://platform.deepseek.com) |
-| `OPENAI_API_KEY` | Yes | OpenAI API key for voice transcription | [platform.openai.com](https://platform.openai.com) |
+| `OPENAI_API_KEY` | Yes | OpenAI API key for AI chat and voice transcription | [platform.openai.com](https://platform.openai.com) |
 | `CIRCLE_BUYER_PRIVATE_KEY` | Yes | Private key of agent EOA wallet (server-only) | Generate a new wallet, export private key, fund with Base Sepolia USDC at [faucet.circle.com](https://faucet.circle.com) |
 | `CIRCLE_SELLER_ADDRESS` | Yes | EVM address that receives x402 seller payments | Any wallet address (e.g. the same receiver used for bill payments) |
 | `NEXT_PUBLIC_APP_URL` | Yes | Deployed app URL (used by AI tools for internal API calls) | Your Vercel URL or `http://localhost:3000` locally |
