@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { createViemAdapterFromProvider } from "@circle-fin/adapter-viem-v2";
 import { arcKit, AGENT_CHAIN, BRIDGE_SOURCE_OPTIONS } from "@/lib/arc-kit";
 import type { BridgeSourceChain } from "@/lib/arc-kit";
@@ -443,7 +444,7 @@ interface FundWalletSheetProps {
 export function FundWalletSheet({ agentAddress, onClose }: FundWalletSheetProps) {
   const [tab, setTab] = useState<"send" | "bridge">("send");
 
-  return (
+  const sheet = (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm">
       <div className="w-full max-w-lg rounded-t-3xl bg-[#1B1C19] border-t border-[#2A2B27] flex flex-col max-h-[90dvh]">
         {/* Header */}
@@ -482,4 +483,6 @@ export function FundWalletSheet({ agentAddress, onClose }: FundWalletSheetProps)
       </div>
     </div>
   );
+
+  return createPortal(sheet, document.body);
 }
