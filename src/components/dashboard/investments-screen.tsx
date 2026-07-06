@@ -160,17 +160,28 @@ export function InvestmentsScreen() {
     (a) => marketFilter === "all" || a.type === marketFilter
   );
 
-  const handleConfirm = (shares: number) => {
+  const handleConfirm = async (shares: number) => {
     if (!buyingAsset) return;
-    buyAsset(
-      buyingAsset.symbol,
-      buyingAsset.name,
-      buyingAsset.type,
-      buyingAsset.icon,
-      shares,
-      buyingAsset.priceUsd
-    );
+    const asset = buyingAsset;
     setBuyingAsset(null);
+
+    let nanopay: { usedNanopay?: boolean; txHash?: string | null } = {};
+    try {
+      const res = await fetch("/api/nanopay/checkout", { method: "POST" });
+      if (res.ok) nanopay = await res.json();
+    } catch {
+      // nanopay settlement is best-effort; the on-chain transfer already succeeded
+    }
+
+    buyAsset(
+      asset.symbol,
+      asset.name,
+      asset.type,
+      asset.icon,
+      shares,
+      asset.priceUsd,
+      nanopay
+    );
   };
 
   return (

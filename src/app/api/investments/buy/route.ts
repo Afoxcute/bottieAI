@@ -3,7 +3,7 @@ import { eq, and } from "drizzle-orm";
 import { verifyAuth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { investments, payments } from "@/lib/db/schema";
-import { INVESTMENT_OPTIONS } from "@/lib/constants";
+import { DEMO_ASSETS } from "@/lib/demo-data";
 
 export async function POST(req: Request) {
   let userId: string;
@@ -35,17 +35,10 @@ export async function POST(req: Request) {
   }
 
   const sym = symbol.toUpperCase();
-  const market = INVESTMENT_OPTIONS[sym];
+  const market = DEMO_ASSETS.find((a) => a.symbol === sym);
   if (!market) {
     return NextResponse.json(
-      { error: `Unknown symbol: ${sym}. Available: ${Object.keys(INVESTMENT_OPTIONS).join(", ")}` },
-      { status: 400 }
-    );
-  }
-
-  if (!market.available) {
-    return NextResponse.json(
-      { error: `${sym} is not currently available for purchase` },
+      { error: `Unknown symbol: ${sym}. Available: ${DEMO_ASSETS.map((a) => a.symbol).join(", ")}` },
       { status: 400 }
     );
   }
@@ -58,7 +51,7 @@ export async function POST(req: Request) {
     );
   }
 
-  const price = pricePerShare ? Number(pricePerShare) : market.currentPriceUsd;
+  const price = pricePerShare ? Number(pricePerShare) : market.priceUsd;
   const totalUsdc = (sharesNum * price).toFixed(6);
 
   let txHash: string | null = null;

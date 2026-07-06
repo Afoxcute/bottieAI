@@ -17,6 +17,8 @@ export type PaymentRecord = {
   description: string;
   amount: number;
   paidAt: string;
+  usedNanopay?: boolean;
+  txHash?: string | null;
 };
 
 export type PortfolioPosition = {
@@ -37,14 +39,20 @@ type State = {
 type CtxValue = State & {
   ready: boolean;
   isBillPaid: (id: string) => boolean;
-  markBillPaid: (billId: string, amount: number, name: string) => void;
+  markBillPaid: (
+    billId: string,
+    amount: number,
+    name: string,
+    nanopay?: { usedNanopay?: boolean; txHash?: string | null }
+  ) => void;
   buyAsset: (
     symbol: string,
     name: string,
     type: string,
     icon: string,
     shares: number,
-    priceUsd: number
+    priceUsd: number,
+    nanopay?: { usedNanopay?: boolean; txHash?: string | null }
   ) => void;
 };
 
@@ -94,7 +102,12 @@ export function DemoStateProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const markBillPaid = useCallback(
-    (billId: string, amount: number, name: string) => {
+    (
+      billId: string,
+      amount: number,
+      name: string,
+      nanopay?: { usedNanopay?: boolean; txHash?: string | null }
+    ) => {
       update((prev) => ({
         ...prev,
         paidBillIds: prev.paidBillIds.includes(billId)
@@ -107,6 +120,8 @@ export function DemoStateProvider({ children }: { children: ReactNode }) {
             description: name,
             amount,
             paidAt: new Date().toISOString(),
+            usedNanopay: nanopay?.usedNanopay,
+            txHash: nanopay?.txHash,
           },
           ...prev.payments,
         ],
@@ -122,7 +137,8 @@ export function DemoStateProvider({ children }: { children: ReactNode }) {
       type: string,
       icon: string,
       shares: number,
-      priceUsd: number
+      priceUsd: number,
+      nanopay?: { usedNanopay?: boolean; txHash?: string | null }
     ) => {
       update((prev) => {
         const existing = prev.portfolio.find((p) => p.symbol === symbol);
@@ -151,6 +167,8 @@ export function DemoStateProvider({ children }: { children: ReactNode }) {
               description: `${shares} share${shares !== 1 ? "s" : ""} of ${symbol}`,
               amount: shares * priceUsd,
               paidAt: new Date().toISOString(),
+              usedNanopay: nanopay?.usedNanopay,
+              txHash: nanopay?.txHash,
             },
             ...prev.payments,
           ],

@@ -66,7 +66,9 @@ export function PaymentsScreen() {
                 <p className="font-semibold text-[#F2F0E8]">
                   ${payment.amount.toFixed(2)}
                 </p>
-                <p className="text-xs text-green-400">Paid</p>
+                <p className="text-xs text-green-400">
+                  {payment.usedNanopay ? "⚡ Nanopay" : "Paid"}
+                </p>
               </div>
             </div>
           ))}

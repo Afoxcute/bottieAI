@@ -1,24 +1,38 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
+import { useWallets } from "@privy-io/react-auth";
 import { createViemAdapterFromProvider } from "@circle-fin/adapter-viem-v2";
 import { arcKit, AGENT_CHAIN, BRIDGE_SOURCE_OPTIONS } from "@/lib/arc-kit";
 import type { BridgeSourceChain } from "@/lib/arc-kit";
 
-// ─── EIP-6963 browser-wallet discovery ───────────────────────────────────────
+// ─── Unified wallet option — merges the user's Privy embedded wallet with any
+// injected (EIP-6963) browser wallets, so funding works with or without a
+// separate extension like MetaMask ───────────────────────────────────────────
+
+type WalletProvider = {
+  request(args: { method: string; params?: unknown[] }): Promise<unknown>;
+};
+
+type WalletOption = {
+  id: string;
+  name: string;
+  icon?: string;
+  address?: string; // pre-known for the Privy embedded wallet
+  provider: WalletProvider;
+};
 
 type EIP6963ProviderDetail = {
   info: { uuid: string; name: string; icon: string; rdns: string };
-  provider: {
-    request(args: { method: string; params?: unknown[] }): Promise<unknown>;
-  };
+  provider: WalletProvider;
 };
 
-function useBrowserWallet() {
+function useFundingWallets() {
+  const { wallets: privyWallets } = useWallets();
   const [discovered, setDiscovered] = useState<EIP6963ProviderDetail[]>([]);
   const [connected, setConnected] = useState<{
-    detail: EIP6963ProviderDetail;
+    option: WalletOption;
     address: string;
   } | null>(null);
   const [connecting, setConnecting] = useState(false);
@@ -37,15 +51,43 @@ function useBrowserWallet() {
     return () => window.removeEventListener("eip6963:announceProvider", onAnnounce);
   }, []);
 
-  const connect = useCallback(async (detail: EIP6963ProviderDetail) => {
+  const options: WalletOption[] = useMemo(() => {
+    const privyOptions: WalletOption[] = privyWallets
+      .filter((w) => w.walletClientType === "privy")
+      .map((w) => ({
+        id: `privy-${w.address}`,
+        name: "Bottie Wallet",
+        address: w.address,
+        provider: {
+          request: async (args) => {
+            const provider = await w.getEthereumProvider();
+            return provider.request(args);
+          },
+        },
+      }));
+
+    const injectedOptions: WalletOption[] = discovered.map((d) => ({
+      id: d.info.uuid,
+      name: d.info.name,
+      icon: d.info.icon,
+      provider: d.provider,
+    }));
+
+    return [...privyOptions, ...injectedOptions];
+  }, [privyWallets, discovered]);
+
+  const connect = useCallback(async (option: WalletOption) => {
+    if (option.address) {
+      setConnected({ option, address: option.address });
+      return;
+    }
     setConnecting(true);
     try {
-      await detail.provider.request({ method: "eth_requestAccounts" });
-      const accounts = (await detail.provider.request({
+      await option.provider.request({ method: "eth_requestAccounts" });
+      const accounts = (await option.provider.request({
         method: "eth_accounts",
       })) as string[];
-      const address = accounts[0] ?? "";
-      setConnected({ detail, address });
+      setConnected({ option, address: accounts[0] ?? "" });
     } finally {
       setConnecting(false);
     }
@@ -53,7 +95,7 @@ function useBrowserWallet() {
 
   const disconnect = useCallback(() => setConnected(null), []);
 
-  return { discovered, connected, connect, disconnect, connecting };
+  return { options, connected, connect, disconnect, connecting };
 }
 
 // ─── Shared state types ───────────────────────────────────────────────────────
@@ -80,15 +122,15 @@ function useCopy(text: string) {
 // ─── Wallet selector ──────────────────────────────────────────────────────────
 
 function WalletSelector({
-  discovered,
+  options,
   connected,
   onConnect,
   onDisconnect,
   connecting,
 }: {
-  discovered: EIP6963ProviderDetail[];
-  connected: { detail: EIP6963ProviderDetail; address: string } | null;
-  onConnect: (d: EIP6963ProviderDetail) => void;
+  options: WalletOption[];
+  connected: { option: WalletOption; address: string } | null;
+  onConnect: (option: WalletOption) => void;
   onDisconnect: () => void;
   connecting: boolean;
 }) {
@@ -96,11 +138,11 @@ function WalletSelector({
     return (
       <div className="flex items-center justify-between rounded-xl bg-[#141513] border border-[#2A2B27] px-4 py-3">
         <div className="flex items-center gap-2.5">
-          {connected.detail.info.icon && (
-            <img src={connected.detail.info.icon} alt="" className="h-6 w-6 rounded" />
+          {connected.option.icon && (
+            <img src={connected.option.icon} alt="" className="h-6 w-6 rounded" />
           )}
           <div>
-            <p className="text-xs font-medium text-[#F2F0E8]">{connected.detail.info.name}</p>
+            <p className="text-xs font-medium text-[#F2F0E8]">{connected.option.name}</p>
             <p className="text-[10px] text-[#A7A79A] font-mono">
               {connected.address.slice(0, 6)}…{connected.address.slice(-4)}
             </p>
@@ -116,31 +158,39 @@ function WalletSelector({
     );
   }
 
-  if (discovered.length === 0) {
+  if (options.length === 0) {
     return (
       <div className="rounded-xl bg-[#141513] border border-[#2A2B27] px-4 py-3 text-sm text-[#A7A79A]">
-        No browser wallets detected. Install MetaMask or another wallet.
+        No wallets available.
       </div>
     );
   }
 
   return (
     <div className="flex flex-col gap-2">
-      {discovered.map((d) => (
+      {options.map((option) => (
         <button
-          key={d.info.uuid}
-          onClick={() => onConnect(d)}
+          key={option.id}
+          onClick={() => onConnect(option)}
           disabled={connecting}
           className="flex items-center gap-3 rounded-xl bg-[#141513] border border-[#2A2B27] px-4 py-3 text-left disabled:opacity-50"
         >
-          {d.info.icon && (
-            <img src={d.info.icon} alt="" className="h-8 w-8 rounded" />
+          {option.icon ? (
+            <img src={option.icon} alt="" className="h-8 w-8 rounded" />
+          ) : (
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#8FAE82]/20 text-sm">
+              🤖
+            </div>
           )}
           <div className="flex-1">
-            <p className="text-sm font-medium text-[#F2F0E8]">{d.info.name}</p>
-            <p className="text-xs text-[#A7A79A]">Click to connect</p>
+            <p className="text-sm font-medium text-[#F2F0E8]">{option.name}</p>
+            <p className="text-xs text-[#A7A79A]">
+              {option.address ? "Your Bottie wallet" : "Click to connect"}
+            </p>
           </div>
-          <span className="text-[#8FAE82] text-xs font-medium">Connect →</span>
+          <span className="text-[#8FAE82] text-xs font-medium">
+            {option.address ? "Use →" : "Connect →"}
+          </span>
         </button>
       ))}
     </div>
@@ -184,7 +234,7 @@ function TxResult({ state, onReset }: { state: TxState; onReset: () => void }) {
 // ─── Send tab ─────────────────────────────────────────────────────────────────
 
 function SendTab({ agentAddress }: { agentAddress: string }) {
-  const { discovered, connected, connect, disconnect, connecting } = useBrowserWallet();
+  const { options, connected, connect, disconnect, connecting } = useFundingWallets();
   const { copied, copy } = useCopy(agentAddress);
   const [amount, setAmount] = useState("");
   const [txState, setTxState] = useState<TxState>({ status: "idle" });
@@ -194,7 +244,7 @@ function SendTab({ agentAddress }: { agentAddress: string }) {
     setTxState({ status: "pending", label: "Preparing transfer…" });
     try {
       const adapter = await createViemAdapterFromProvider({
-        provider: connected.detail.provider as Parameters<typeof createViemAdapterFromProvider>[0]["provider"],
+        provider: connected.option.provider as Parameters<typeof createViemAdapterFromProvider>[0]["provider"],
       });
 
       setTxState({ status: "pending", label: "Confirm in your wallet…" });
@@ -246,13 +296,13 @@ function SendTab({ agentAddress }: { agentAddress: string }) {
         <div className="flex-1 border-t border-[#2A2B27]" />
       </div>
 
-      {/* Browser wallet */}
+      {/* Wallet selector */}
       <div>
         <p className="mb-1.5 text-xs font-medium text-[#A7A79A]">
-          Connect a browser wallet (Base Sepolia)
+          Choose a wallet (Base Sepolia)
         </p>
         <WalletSelector
-          discovered={discovered}
+          options={options}
           connected={connected}
           onConnect={connect}
           onDisconnect={disconnect}
@@ -297,7 +347,7 @@ function SendTab({ agentAddress }: { agentAddress: string }) {
 // ─── Bridge tab ───────────────────────────────────────────────────────────────
 
 function BridgeTab({ agentAddress }: { agentAddress: string }) {
-  const { discovered, connected, connect, disconnect, connecting } = useBrowserWallet();
+  const { options, connected, connect, disconnect, connecting } = useFundingWallets();
   const [sourceChain, setSourceChain] = useState<BridgeSourceChain>(
     BRIDGE_SOURCE_OPTIONS[0].value
   );
@@ -311,7 +361,7 @@ function BridgeTab({ agentAddress }: { agentAddress: string }) {
     setTxState({ status: "pending", label: "Preparing bridge…" });
     try {
       const adapter = await createViemAdapterFromProvider({
-        provider: connected.detail.provider as Parameters<typeof createViemAdapterFromProvider>[0]["provider"],
+        provider: connected.option.provider as Parameters<typeof createViemAdapterFromProvider>[0]["provider"],
       });
 
       setTxState({ status: "pending", label: "Confirm in your wallet…" });
@@ -384,13 +434,13 @@ function BridgeTab({ agentAddress }: { agentAddress: string }) {
         </div>
       </div>
 
-      {/* Browser wallet */}
+      {/* Wallet selector */}
       <div>
         <p className="mb-1.5 text-xs font-medium text-[#A7A79A]">
-          Connect a browser wallet on {selectedSource.label}
+          Choose a wallet on {selectedSource.label}
         </p>
         <WalletSelector
-          discovered={discovered}
+          options={options}
           connected={connected}
           onConnect={connect}
           onDisconnect={disconnect}

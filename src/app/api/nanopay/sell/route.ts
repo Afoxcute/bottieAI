@@ -71,7 +71,7 @@ export async function GET(req: Request) {
   // Payment confirmed — serve premium content
   return Response.json(
     {
-      content: "Premium savings insights powered by Circle Gateway nanopayments",
+      content: "Payment receipt confirmed via Circle Gateway nanopayments",
       paidBy: settlement.payer,
       transaction: settlement.transaction,
       priceUSDC: PRICE_USD,

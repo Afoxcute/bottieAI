@@ -79,10 +79,20 @@ export function BillsScreen() {
     0
   );
 
-  const handleSuccess = (txHash: string) => {
+  const handleSuccess = async (txHash: string) => {
     if (!payingBill) return;
-    markBillPaid(payingBill.id, payingBill.amount, payingBill.name);
+    const bill = payingBill;
     setPayingBill(null);
+
+    let nanopay: { usedNanopay?: boolean; txHash?: string | null } = {};
+    try {
+      const res = await fetch("/api/nanopay/checkout", { method: "POST" });
+      if (res.ok) nanopay = await res.json();
+    } catch {
+      // nanopay settlement is best-effort; the on-chain transfer already succeeded
+    }
+
+    markBillPaid(bill.id, bill.amount, bill.name, nanopay);
   };
 
   return (
