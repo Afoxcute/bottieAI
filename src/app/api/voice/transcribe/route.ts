@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { verifyAuth } from "@/lib/auth";
 
-const GROQ_API_URL = "https://api.groq.com/openai/v1/audio/transcriptions";
-const GROQ_MODEL = "whisper-large-v3-turbo";
+const OPENAI_API_URL = "https://api.openai.com/v1/audio/transcriptions";
+const OPENAI_MODEL = "whisper-1";
 
 export async function POST(req: Request) {
   try {
@@ -11,8 +11,8 @@ export async function POST(req: Request) {
     return new Response("Unauthorized", { status: 401 });
   }
 
-  const GROQ_API_KEY = process.env.GROQ_API_KEY;
-  if (!GROQ_API_KEY) {
+  const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+  if (!OPENAI_API_KEY) {
     return NextResponse.json(
       { error: "Voice transcription not configured" },
       { status: 500 },
@@ -45,23 +45,23 @@ export async function POST(req: Request) {
     );
   }
 
-  const groqFormData = new FormData();
-  groqFormData.append("file", audioFile);
-  groqFormData.append("model", GROQ_MODEL);
-  groqFormData.append("language", "en");
-  groqFormData.append("response_format", "json");
-  groqFormData.append("temperature", "0");
+  const openaiFormData = new FormData();
+  openaiFormData.append("file", audioFile);
+  openaiFormData.append("model", OPENAI_MODEL);
+  openaiFormData.append("language", "en");
+  openaiFormData.append("response_format", "json");
+  openaiFormData.append("temperature", "0");
 
   try {
-    const response = await fetch(GROQ_API_URL, {
+    const response = await fetch(OPENAI_API_URL, {
       method: "POST",
-      headers: { Authorization: `Bearer ${GROQ_API_KEY}` },
-      body: groqFormData,
+      headers: { Authorization: `Bearer ${OPENAI_API_KEY}` },
+      body: openaiFormData,
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("[Voice] Groq API error:", response.status, errorText);
+      console.error("[Voice] OpenAI API error:", response.status, errorText);
       if (response.status === 429) {
         return NextResponse.json(
           { error: "Rate limit exceeded. Please try again later." },

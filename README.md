@@ -27,7 +27,7 @@ Bottie is a mobile-first AI financial assistant that lets you manage recurring s
 - **Web2-friendly UX** — No crypto jargon. "Payment cancelled" not "transaction rejected". Receiver wallet never shown in the UI.
 - **Low-balance alert** — Amber banner appears when USDC balance < $10, with a one-tap "Add Funds" button.
 - **Payment history** — All AI-executed payments are recorded in Postgres (via Drizzle + Neon). UI payments are tracked in localStorage.
-- **Voice input** — Groq Whisper for chat voice transcription.
+- **Voice input** — OpenAI Whisper for chat voice transcription.
 - **PWA** — Installable as a home screen app.
 
 ---
@@ -127,7 +127,7 @@ await arcKit.bridge({
 |-------|-----------|
 | Framework | Next.js 15, React 19, TypeScript |
 | Styling | Tailwind CSS v4 |
-| AI | Vercel AI SDK v5, DeepSeek Chat, Groq Whisper |
+| AI | Vercel AI SDK v5, DeepSeek Chat, OpenAI Whisper |
 | Auth | Privy (EOA embedded wallets) |
 | Onchain | wagmi v2, viem |
 | Arc AppKit | `@circle-fin/app-kit`, `@circle-fin/adapter-viem-v2` |
@@ -222,7 +222,7 @@ cp .env.example .env
 | `NEXT_PUBLIC_ALCHEMY_API_KEY` | Yes | Alchemy RPC key for Base Sepolia | [dashboard.alchemy.com](https://dashboard.alchemy.com) |
 | `DATABASE_URL` | Yes | Neon Postgres connection string | [neon.tech](https://neon.tech) |
 | `DEEPSEEK_API_KEY` | Yes | DeepSeek API key for AI chat | [platform.deepseek.com](https://platform.deepseek.com) |
-| `GROQ_API_KEY` | Yes | Groq API key for voice transcription | [console.groq.com](https://console.groq.com) |
+| `OPENAI_API_KEY` | Yes | OpenAI API key for voice transcription | [platform.openai.com](https://platform.openai.com) |
 | `CIRCLE_BUYER_PRIVATE_KEY` | Yes | Private key of agent EOA wallet (server-only) | Generate a new wallet, export private key, fund with Base Sepolia USDC at [faucet.circle.com](https://faucet.circle.com) |
 | `CIRCLE_SELLER_ADDRESS` | Yes | EVM address that receives x402 seller payments | Any wallet address (e.g. the same receiver used for bill payments) |
 | `NEXT_PUBLIC_APP_URL` | Yes | Deployed app URL (used by AI tools for internal API calls) | Your Vercel URL or `http://localhost:3000` locally |
