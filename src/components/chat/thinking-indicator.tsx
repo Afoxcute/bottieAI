@@ -6,11 +6,11 @@ import { motion, AnimatePresence } from "framer-motion";
 const SPINNER_FRAMES = ["✦", "✧", "✶", "✷", "✸", "✹", "✺", "✻"];
 
 const BOTTIE_PHRASES = [
-  "Checking rates",
+  "Checking bills",
   "Crunching numbers",
-  "Comparing accounts",
-  "Reviewing savings",
-  "Calculating yield",
+  "Looking up prices",
+  "Reviewing portfolio",
+  "Fetching market data",
   "Analyzing options",
   "Looking things up",
   "Working on it",

@@ -6,9 +6,9 @@ import { useHandleLogin } from "@/hooks/use-handle-login";
 
 /* ── Prompts ──────────────────────────────────────────────── */
 const PROMPTS = [
-  "Save for a trip to Bali",
-  "Build a 3-month emergency fund",
-  "Earn more on my idle cash",
+  "Pay my Netflix and Spotify bills",
+  "Buy 2 shares of Apple",
+  "What's my portfolio worth?",
 ];
 
 /* ── Cursor SVG ───────────────────────────────────────────── */
@@ -219,7 +219,7 @@ function MorphingCTA({ onLogin }: { onLogin: () => void }) {
                 exit={{ opacity: 0, transition: { duration: 0.1 } }}
                 className="flex items-center gap-3 py-2.5 pl-5 pr-2"
               >
-                <span className="font-body text-sm font-medium text-cream">Start saving</span>
+                <span className="font-body text-sm font-medium text-cream">Get started</span>
                 <span className="flex h-8 w-8 items-center justify-center rounded-full bg-cream/20 transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:translate-x-0.5">
                   <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
                     <path d="M2.5 7h9M8 3.5L11.5 7 8 10.5" stroke="var(--color-cream)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -252,7 +252,7 @@ const wordVariant = {
     transition: { duration: 0.65, ease: [0.16, 1, 0.3, 1] as [number, number, number, number] },
   },
 };
-const WORDS = ["Onchain", "savings", "made", "easy."];
+const WORDS = ["Your", "AI", "finance", "assistant."];
 
 /* ── Hero ─────────────────────────────────────────────────── */
 export function HeroSection() {

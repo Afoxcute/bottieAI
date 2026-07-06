@@ -11,13 +11,13 @@ const STEPS = [
   },
   {
     number: "02",
-    title: "Tell it your goal",
-    micro: "vacation, emergency fund, or just earning more",
+    title: "Tell Bottie what you need",
+    micro: "pay a bill, buy a stock, check your balance — just ask",
   },
   {
     number: "03",
-    title: "Start earning",
-    micro: "deposit once, earn automatically, withdraw anytime",
+    title: "Done — instantly",
+    micro: "Circle nanopayments settle in seconds, no gas, no fuss",
   },
 ];
 
