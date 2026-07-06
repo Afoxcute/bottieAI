@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { useWallets } from "@privy-io/react-auth";
 import { arcKit, AGENT_CHAIN } from "@/lib/arc-kit";
 import { createViemAdapterFromProvider } from "@circle-fin/adapter-viem-v2";
 import { useWriteContract, useWaitForTransactionReceipt } from "wagmi";
@@ -22,19 +23,6 @@ const TRANSFER_ABI = [
   },
 ] as const;
 
-function useFirstBrowserWallet() {
-  const [provider, setProvider] = useState<any>(null);
-  useEffect(() => {
-    const handler = (e: any) => {
-      setProvider((prev: any) => prev ?? e.detail.provider);
-    };
-    window.addEventListener("eip6963:announceProvider", handler);
-    window.dispatchEvent(new Event("eip6963:requestProvider"));
-    return () => window.removeEventListener("eip6963:announceProvider", handler);
-  }, []);
-  return provider;
-}
-
 interface PaymentModalProps {
   title: string;
   subtitle: string;
@@ -54,11 +42,11 @@ export function PaymentModal({
   onSuccess,
   onClose,
 }: PaymentModalProps) {
-  const browserProvider = useFirstBrowserWallet();
+  const { wallets } = useWallets();
   const [arcPending, setArcPending] = useState(false);
   const [arcError, setArcError] = useState<string | null>(null);
 
-  // wagmi fallback (used when no EIP-6963 browser wallet is present)
+  // wagmi fallback — only used when no Privy wallet is available
   const {
     writeContract,
     data: txHash,
@@ -76,16 +64,19 @@ export function PaymentModal({
     }
   }, [isConfirmed, txHash, onSuccess]);
 
-  const handlePay = async () => {
-    // Prevent double-submit — isBusy state may not have re-rendered yet
+  const handlePay = useCallback(async () => {
     if (arcPending || isPending || isConfirming) return;
     setArcError(null);
 
-    if (browserProvider) {
-      // Arc AppKit send path — preferred when browser wallet available
+    // Prefer Privy embedded wallet — gasless via Arc AppKit send
+    const privyWallet =
+      wallets.find((w) => w.walletClientType === "privy") ?? wallets[0];
+
+    if (privyWallet) {
       setArcPending(true);
       try {
-        const adapter = await createViemAdapterFromProvider({ provider: browserProvider });
+        const provider = await privyWallet.getEthereumProvider();
+        const adapter = await createViemAdapterFromProvider({ provider });
         const result = await arcKit.send({
           from: { adapter, chain: AGENT_CHAIN },
           to: RECEIVER,
@@ -113,7 +104,7 @@ export function PaymentModal({
       return;
     }
 
-    // wagmi fallback
+    // wagmi fallback for non-Privy wallets (requires gas)
     reset();
     writeContract({
       address: USDC_CONTRACT,
@@ -121,7 +112,7 @@ export function PaymentModal({
       functionName: "transfer",
       args: [RECEIVER, parseUnits(amount.toFixed(6), 6)],
     });
-  };
+  }, [arcPending, isPending, isConfirming, wallets, amount, onSuccess, reset, writeContract]);
 
   const isBusy = arcPending || isPending || isConfirming;
 
