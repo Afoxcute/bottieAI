@@ -76,7 +76,8 @@ export function PaymentModal({
       setArcPending(true);
       try {
         const provider = await privyWallet.getEthereumProvider();
-        const adapter = await createViemAdapterFromProvider({ provider });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const adapter = await createViemAdapterFromProvider({ provider: provider as any });
         const result = await arcKit.send({
           from: { adapter, chain: AGENT_CHAIN },
           to: RECEIVER,
