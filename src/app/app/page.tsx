@@ -3,14 +3,14 @@
 import { useState } from "react";
 import { usePrivy } from "@privy-io/react-auth";
 import { useChatSheet } from "@/contexts/chat-context";
-import { DemoStateProvider, useDemoState } from "@/contexts/demo-state-context";
+import { useDemoState } from "@/contexts/demo-state-context";
 import { BillsScreen } from "@/components/dashboard/bills-screen";
 import { InvestmentsScreen } from "@/components/dashboard/investments-screen";
 import { PaymentsScreen } from "@/components/dashboard/payments-screen";
 import { FundWalletSheet } from "@/components/dashboard/fund-wallet-sheet";
 import { useUsdcBalance, LOW_BALANCE_THRESHOLD_USD } from "@/hooks/use-usdc-balance";
 import { DEMO_BILLS, ASSET_PRICES } from "@/lib/demo-data";
-import { getUserFirstName } from "@/lib/user-display-name";
+import { getUserFirstName, getTimeBasedGreeting } from "@/lib/user-display-name";
 
 type Tab = "bills" | "investments" | "payments" | "chat";
 
@@ -32,6 +32,7 @@ function DashboardInner() {
   const { balance: usdcBalance, isLow: balanceIsLow, formatted: balanceFormatted } =
     useUsdcBalance(agentAddress);
   const firstName = getUserFirstName(user);
+  const greeting = getTimeBasedGreeting();
 
   const handleTabClick = (tab: Tab) => {
     if (tab === "chat") {
@@ -117,7 +118,7 @@ function DashboardInner() {
         }`}
       >
         <p className="mb-3 text-lg font-semibold text-[#F2F0E8]">
-          Hey{firstName ? `, ${firstName}` : ""} 👋
+          {greeting}{firstName ? `, ${firstName}` : ""} 👋
         </p>
 
         <div className="flex gap-3">
@@ -203,9 +204,5 @@ function DashboardInner() {
 }
 
 export default function DashboardPage() {
-  return (
-    <DemoStateProvider>
-      <DashboardInner />
-    </DemoStateProvider>
-  );
+  return <DashboardInner />;
 }

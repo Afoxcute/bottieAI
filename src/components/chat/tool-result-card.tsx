@@ -1,6 +1,8 @@
 "use client";
 
 import { VAULT_FRIENDLY_NAMES } from "@/lib/constants";
+import { PayBillConfirmCard } from "./pay-bill-confirm-card";
+import { BuyAssetConfirmCard } from "./buy-asset-confirm-card";
 
 interface ToolResultCardProps {
   toolName: string;
@@ -17,6 +19,32 @@ export function ToolResultCard({
     data = typeof result === "string" ? JSON.parse(result) : result;
   } catch {
     return null;
+  }
+
+  if (toolName === "pay_bill" && data?.pendingPayment) {
+    return (
+      <PayBillConfirmCard
+        billId={data.billId}
+        billName={data.billName}
+        amount={data.amount}
+        icon={data.icon}
+        description={data.description}
+      />
+    );
+  }
+
+  if (toolName === "buy_investment" && data?.pendingPurchase) {
+    return (
+      <BuyAssetConfirmCard
+        symbol={data.symbol}
+        assetName={data.assetName}
+        shares={data.shares}
+        priceUsd={data.priceUsd}
+        totalUsdc={data.totalUsdc}
+        icon={data.icon}
+        type={data.type}
+      />
+    );
   }
 
   if (toolName === "get_vault_rates" && Array.isArray(data)) {

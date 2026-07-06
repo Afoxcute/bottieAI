@@ -38,7 +38,7 @@ export function createTools(walletAddress?: string, userId?: string) {
 
     pay_bill: tool({
       description:
-        "Pay for a bill or subscription by name or ID. The user must explicitly confirm the purchase. Uses Circle Gateway nanopayments on Base Sepolia.",
+        "Queue a bill payment for user confirmation. Returns a pending action that renders a Confirm button in the UI — the actual USDC transfer and state update happen client-side when the user taps Confirm.",
       inputSchema: z.object({
         billName: z
           .string()
@@ -52,7 +52,6 @@ export function createTools(walletAddress?: string, userId?: string) {
           .describe("Bill ID to pay (use the id from get_bills)"),
       }),
       execute: async ({ billName, billId }) => {
-        if (!userId) return { error: "Not authenticated" };
         if (!billName && !billId) return { error: "Provide a bill name or ID" };
 
         const bill = billId
@@ -67,40 +66,15 @@ export function createTools(walletAddress?: string, userId?: string) {
           };
         }
 
-        let txHash: string | null = null;
-
-        if (process.env.CIRCLE_BUYER_PRIVATE_KEY) {
-          try {
-            const { getBuyerClient } = await import("@/lib/circle-gateway");
-            const client = getBuyerClient();
-            const base =
-              process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-            const result = await client.pay(`${base}/api/nanopay/sell`);
-            txHash = result?.transaction ?? null;
-          } catch {
-            // simulation mode — no key or gateway unavailable
-          }
-        }
-
-        const [payment] = await db
-          .insert(payments)
-          .values({
-            userId,
-            type: "bill",
-            referenceId: bill.id,
-            description: `Paid ${bill.name}`,
-            amountUsdc: bill.amount.toFixed(6),
-            status: "completed",
-            txHash,
-          })
-          .returning();
-
+        // Return pending — the UI renders a confirm card that triggers arcKit.send()
+        // from the user's Privy wallet and calls markBillPaid on success.
         return {
-          success: true,
-          message: `Successfully paid ${bill.name} — $${bill.amount.toFixed(2)} USDC`,
-          bill: { id: bill.id, name: bill.name, amount: bill.amount },
-          paymentId: payment.id,
-          usedNanopay: !!txHash,
+          pendingPayment: true,
+          billId: bill.id,
+          billName: bill.name,
+          amount: bill.amount,
+          icon: bill.icon,
+          description: bill.description,
         };
       },
     }),
@@ -136,7 +110,7 @@ export function createTools(walletAddress?: string, userId?: string) {
 
     buy_investment: tool({
       description:
-        "Buy shares of a stock, pre-IPO company, or ETF using USDC. The user must confirm the purchase. Uses Circle Gateway nanopayments on Base Sepolia.",
+        "Queue an investment purchase for user confirmation. Returns a pending action that renders a Confirm button in the UI — the actual USDC transfer and portfolio update happen client-side when the user taps Confirm.",
       inputSchema: z.object({
         symbol: z
           .string()
@@ -148,7 +122,6 @@ export function createTools(walletAddress?: string, userId?: string) {
           .describe("Number of shares to buy, e.g. '1', '0.5', '2'"),
       }),
       execute: async ({ symbol, shares }) => {
-        if (!userId) return { error: "Not authenticated" };
         const sym = symbol.toUpperCase();
         const asset = DEMO_ASSETS.find((a) => a.symbol === sym);
 
@@ -163,44 +136,17 @@ export function createTools(walletAddress?: string, userId?: string) {
           return { error: "Invalid number of shares" };
         }
 
-        const totalUsdc = (sharesNum * asset.priceUsd).toFixed(6);
-        let txHash: string | null = null;
-
-        if (process.env.CIRCLE_BUYER_PRIVATE_KEY) {
-          try {
-            const { getBuyerClient } = await import("@/lib/circle-gateway");
-            const client = getBuyerClient();
-            const base =
-              process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-            const result = await client.pay(`${base}/api/nanopay/sell`);
-            txHash = result?.transaction ?? null;
-          } catch {
-            // simulation mode
-          }
-        }
-
-        const [payment] = await db
-          .insert(payments)
-          .values({
-            userId,
-            type: "investment",
-            referenceId: sym,
-            description: `Bought ${shares} shares of ${asset.name} (${sym})`,
-            amountUsdc: totalUsdc,
-            status: "completed",
-            txHash,
-          })
-          .returning();
-
+        // Return pending — the UI renders a confirm card that triggers arcKit.send()
+        // from the user's Privy wallet and calls buyAsset on success.
         return {
-          success: true,
-          message: `Bought ${shares} shares of ${asset.name} (${sym}) for $${totalUsdc} USDC`,
+          pendingPurchase: true,
           symbol: sym,
-          shares,
-          pricePerShare: asset.priceUsd,
-          totalUsdc,
-          paymentId: payment.id,
-          usedNanopay: !!txHash,
+          assetName: asset.name,
+          shares: sharesNum,
+          priceUsd: asset.priceUsd,
+          totalUsdc: sharesNum * asset.priceUsd,
+          icon: asset.icon,
+          type: asset.type,
         };
       },
     }),

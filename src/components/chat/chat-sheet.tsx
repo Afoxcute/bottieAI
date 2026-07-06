@@ -5,7 +5,7 @@ import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { usePrivy } from "@privy-io/react-auth";
 import { useChatSheet } from "@/contexts/chat-context";
-import { getUserFirstName } from "@/lib/user-display-name";
+import { getUserFirstName, getTimeBasedGreeting } from "@/lib/user-display-name";
 import { MessageBubble } from "./message-bubble";
 import { ThinkingIndicator } from "./thinking-indicator";
 import { ToolApprovalCard } from "./tool-approval-card";
@@ -30,6 +30,7 @@ export function ChatSheet({ visible }: ChatSheetProps) {
   const userScrolledRef = useRef(false);
 
   const name = getUserFirstName(user);
+  const greeting = getTimeBasedGreeting();
 
   const walletAddress = user?.smartWallet?.address ?? user?.wallet?.address;
 
@@ -149,7 +150,7 @@ export function ChatSheet({ visible }: ChatSheetProps) {
             {messages.length === 0 && (
               <div className="py-6">
                 <p className="font-display text-[1.4rem] leading-snug text-ink">
-                  Hey{name ? `, ${name}` : ""}. 👋
+                  {greeting}{name ? `, ${name}` : ""}. 👋
                 </p>
                 <p className="mt-3 font-body text-[1rem] leading-relaxed text-ink/60">
                   I&rsquo;m Bottie, your financial assistant. Ask me to pay your bills, invest in stocks, or check your portfolio.

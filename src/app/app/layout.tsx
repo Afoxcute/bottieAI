@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChatProvider, useChatSheet } from "@/contexts/chat-context";
+import { DemoStateProvider } from "@/contexts/demo-state-context";
 import { GoalsProvider } from "@/contexts/goals-context";
 import { ChatSheet } from "@/components/chat/chat-sheet";
 import { useVoiceRecorder } from "@/hooks/use-voice-recorder";
@@ -37,11 +38,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   if (!authenticated) return null;
 
   return (
-    <ChatProvider>
-      <GoalsProvider value={{ goals: {}, refetch: async () => {} }}>
-        <AppShell>{children}</AppShell>
-      </GoalsProvider>
-    </ChatProvider>
+    <DemoStateProvider>
+      <ChatProvider>
+        <GoalsProvider value={{ goals: {}, refetch: async () => {} }}>
+          <AppShell>{children}</AppShell>
+        </GoalsProvider>
+      </ChatProvider>
+    </DemoStateProvider>
   );
 }
 
