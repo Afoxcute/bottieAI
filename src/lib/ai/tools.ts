@@ -1,9 +1,9 @@
 import { tool } from "ai";
 import { z } from "zod";
-import { eq, desc, and, or } from "drizzle-orm";
-import { INVESTMENT_OPTIONS, BILL_PROVIDERS } from "@/lib/constants";
+import { eq, desc } from "drizzle-orm";
+import { DEMO_BILLS, DEMO_ASSETS } from "@/lib/demo-data";
 import { db } from "@/lib/db";
-import { bills, investments, payments } from "@/lib/db/schema";
+import { payments } from "@/lib/db/schema";
 
 export function createTools(walletAddress?: string, userId?: string) {
   return {
@@ -11,189 +11,95 @@ export function createTools(walletAddress?: string, userId?: string) {
 
     get_bills: tool({
       description:
-        "Fetch the user's tracked bills — subscriptions, utilities, cable, internet. Returns all bills with status.",
+        "List all available bills and subscriptions — streaming, internet, cable, and utilities. Returns the full catalog with amounts and due dates.",
       inputSchema: z.object({
         category: z
-          .string()
+          .enum(["streaming", "internet", "cable", "utility"])
           .optional()
-          .describe("Filter by category: streaming, internet, cable, utility"),
+          .describe("Filter by category"),
       }),
       execute: async ({ category }) => {
-        if (!userId) return { error: "Not authenticated" };
-        try {
-          const userBills = await db
-            .select()
-            .from(bills)
-            .where(eq(bills.userId, userId))
-            .orderBy(desc(bills.createdAt));
-
-          const filtered = category
-            ? userBills.filter((b) => b.category === category)
-            : userBills;
-
-          if (filtered.length === 0)
-            return { message: "No bills found", bills: [] };
-
-          return {
-            bills: filtered.map((b) => ({
-              id: b.id,
-              name: b.name,
-              category: b.category,
-              amount: b.amount,
-              dueDate: b.dueDate,
-              status: b.status,
-              autopay: b.autopay,
-            })),
-          };
-        } catch (err: any) {
-          return { error: err?.message || "Failed to fetch bills" };
-        }
+        const list = category
+          ? DEMO_BILLS.filter((b) => b.category === category)
+          : DEMO_BILLS;
+        return {
+          bills: list.map((b) => ({
+            id: b.id,
+            name: b.name,
+            category: b.category,
+            amount: b.amount,
+            description: b.description,
+            dueDay: b.dueDay,
+          })),
+          count: list.length,
+        };
       },
     }),
 
     pay_bill: tool({
       description:
-        "Pay a specific bill by name or ID. The user must have explicitly said 'pay my [bill name] bill' or similar. Looks up the bill, sends USDC payment via Circle Gateway (or simulates if no key set), records the payment.",
+        "Pay for a bill or subscription by name or ID. The user must explicitly confirm the purchase. Uses Circle Gateway nanopayments on Base Sepolia.",
       inputSchema: z.object({
         billName: z
           .string()
           .optional()
-          .describe("The bill name to pay (e.g. 'Netflix', 'AT&T Internet')"),
+          .describe("Bill name to pay, e.g. 'Netflix', 'Spotify', 'AT&T Fiber'"),
         billId: z
           .string()
           .optional()
-          .describe("The bill ID to pay (UUID)"),
+          .describe("Bill ID to pay (use the id from get_bills)"),
       }),
       execute: async ({ billName, billId }) => {
         if (!userId) return { error: "Not authenticated" };
-        if (!billName && !billId)
-          return { error: "Provide a bill name or ID" };
+        if (!billName && !billId) return { error: "Provide a bill name or ID" };
 
-        try {
-          // Find the bill
-          const userBills = await db
-            .select()
-            .from(bills)
-            .where(eq(bills.userId, userId));
+        const bill = billId
+          ? DEMO_BILLS.find((b) => b.id === billId)
+          : DEMO_BILLS.find((b) =>
+              b.name.toLowerCase().includes((billName ?? "").toLowerCase()),
+            );
 
-          const bill = billId
-            ? userBills.find((b) => b.id === billId)
-            : userBills.find((b) =>
-                b.name.toLowerCase().includes((billName ?? "").toLowerCase())
-              );
+        if (!bill) {
+          return {
+            error: `Bill not found: ${billName ?? billId}. Use get_bills to see available options.`,
+          };
+        }
 
-          if (!bill) return { error: `Bill not found: ${billName ?? billId}` };
-          if (bill.status === "paid")
-            return { message: `${bill.name} is already marked as paid.` };
+        let txHash: string | null = null;
 
-          const amountUsdc = String(bill.amount);
-          let txHash: string | null = null;
-          let paymentStatus = "completed";
-
-          // Attempt real payment if key available
-          if (process.env.CIRCLE_BUYER_PRIVATE_KEY && bill.payeeAddress) {
-            try {
-              const { getBuyerClient } = await import("@/lib/circle-gateway");
-              const client = getBuyerClient();
-              // Use a simple transfer / pay call — simulate URL payment
-              const resourceUrl = `https://pay.bottie.app/bill/${bill.id}`;
-              // For demo: attempt nanopay-style payment via the gateway
-              const result = await (client as any).pay?.(resourceUrl).catch(() => null);
-              txHash = result?.transaction ?? null;
-            } catch {
-              // Fall through to simulation
-            }
+        if (process.env.CIRCLE_BUYER_PRIVATE_KEY) {
+          try {
+            const { getBuyerClient } = await import("@/lib/circle-gateway");
+            const client = getBuyerClient();
+            const base =
+              process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+            const result = await client.pay(`${base}/api/nanopay/sell`);
+            txHash = result?.transaction ?? null;
+          } catch {
+            // simulation mode — no key or gateway unavailable
           }
+        }
 
-          // Record payment
-          const [payment] = await db
-            .insert(payments)
-            .values({
-              userId,
-              type: "bill",
-              referenceId: bill.id,
-              description: `Paid ${bill.name}`,
-              amountUsdc,
-              status: paymentStatus,
-              txHash,
-            })
-            .returning();
-
-          // Update bill status
-          await db
-            .update(bills)
-            .set({ status: "paid", updatedAt: new Date() })
-            .where(eq(bills.id, bill.id));
-
-          return {
-            success: true,
-            message: `Successfully paid ${bill.name} — $${amountUsdc} USDC`,
-            paymentId: payment.id,
+        const [payment] = await db
+          .insert(payments)
+          .values({
+            userId,
+            type: "bill",
+            referenceId: bill.id,
+            description: `Paid ${bill.name}`,
+            amountUsdc: bill.amount.toFixed(6),
+            status: "completed",
             txHash,
-            simulated: !txHash,
-          };
-        } catch (err: any) {
-          return { error: err?.message || "Payment failed" };
-        }
-      },
-    }),
+          })
+          .returning();
 
-    add_bill: tool({
-      description:
-        "Add a new bill or subscription to track. Use when the user wants to add a bill to their list.",
-      inputSchema: z.object({
-        name: z.string().describe("Bill name, e.g. 'Netflix', 'AT&T Internet'"),
-        category: z
-          .enum(["streaming", "cable", "internet", "utility", "investment"])
-          .describe("Category of the bill"),
-        amount: z
-          .string()
-          .describe("Monthly amount in USDC, e.g. '15.49'"),
-        dueDate: z
-          .string()
-          .optional()
-          .describe("Due date, e.g. '15' for 15th of month or '2024-02-15'"),
-        autopay: z.boolean().optional().describe("Whether to autopay this bill"),
-      }),
-      execute: async ({ name, category, amount, dueDate, autopay }) => {
-        if (!userId) return { error: "Not authenticated" };
-        try {
-          // Look up known provider for payee address
-          const providerKey = Object.keys(BILL_PROVIDERS).find((k) =>
-            name.toLowerCase().includes(k) ||
-            BILL_PROVIDERS[k].name.toLowerCase().includes(name.toLowerCase())
-          );
-          const provider = providerKey ? BILL_PROVIDERS[providerKey] : null;
-
-          const [bill] = await db
-            .insert(bills)
-            .values({
-              userId,
-              name,
-              category,
-              amount,
-              dueDate: dueDate ?? null,
-              payeeAddress: provider?.payeeAddress ?? null,
-              autopay: autopay ?? false,
-              status: "pending",
-              logoUrl: provider?.logo ?? null,
-            })
-            .returning();
-
-          return {
-            success: true,
-            bill: {
-              id: bill.id,
-              name: bill.name,
-              category: bill.category,
-              amount: bill.amount,
-              dueDate: bill.dueDate,
-              status: bill.status,
-            },
-          };
-        } catch (err: any) {
-          return { error: err?.message || "Failed to add bill" };
-        }
+        return {
+          success: true,
+          message: `Successfully paid ${bill.name} — $${bill.amount.toFixed(2)} USDC`,
+          bill: { id: bill.id, name: bill.name, amount: bill.amount },
+          paymentId: payment.id,
+          usedNanopay: !!txHash,
+        };
       },
     }),
 
@@ -201,163 +107,103 @@ export function createTools(walletAddress?: string, userId?: string) {
 
     get_investments: tool({
       description:
-        "Fetch the user's current investment portfolio — stocks, ETFs, pre-IPO positions.",
-      inputSchema: z.object({}),
-      execute: async () => {
-        if (!userId) return { error: "Not authenticated" };
-        try {
-          const positions = await db
-            .select()
-            .from(investments)
-            .where(eq(investments.userId, userId))
-            .orderBy(desc(investments.createdAt));
-
-          if (positions.length === 0)
-            return { message: "No investments yet", portfolio: [] };
-
-          const portfolio = positions.map((pos) => {
-            const market = INVESTMENT_OPTIONS[pos.symbol];
-            const currentPrice = market?.currentPriceUsd ?? Number(pos.avgPriceUsd);
-            const currentValue = currentPrice * Number(pos.shares);
-            const costBasis = Number(pos.avgPriceUsd) * Number(pos.shares);
-            const gainLoss = currentValue - costBasis;
-            return {
-              id: pos.id,
-              symbol: pos.symbol,
-              name: pos.name,
-              type: pos.type,
-              shares: pos.shares,
-              avgPriceUsd: pos.avgPriceUsd,
-              currentPriceUsd: currentPrice.toFixed(2),
-              currentValueUsd: currentValue.toFixed(2),
-              gainLossUsd: gainLoss.toFixed(2),
-            };
-          });
-
-          const totalValue = portfolio.reduce(
-            (sum, p) => sum + Number(p.currentValueUsd),
-            0
-          );
-
-          return { portfolio, totalValueUsd: totalValue.toFixed(2) };
-        } catch (err: any) {
-          return { error: err?.message || "Failed to fetch investments" };
-        }
+        "List available investments — stocks, pre-IPO companies, and ETFs with current prices and 24h change.",
+      inputSchema: z.object({
+        type: z
+          .enum(["stock", "ipo", "etf", "all"])
+          .optional()
+          .describe("Filter by asset type"),
+      }),
+      execute: async ({ type }) => {
+        const list =
+          type && type !== "all"
+            ? DEMO_ASSETS.filter((a) => a.type === type)
+            : DEMO_ASSETS;
+        return {
+          assets: list.map((a) => ({
+            symbol: a.symbol,
+            name: a.name,
+            type: a.type,
+            priceUsd: a.priceUsd,
+            change24h: a.change24h,
+            description: a.description,
+          })),
+        };
       },
     }),
 
     buy_investment: tool({
       description:
-        "Buy shares of a stock, ETF, or pre-IPO company using USDC. The user must confirm the purchase. Calculates total USDC cost and records the transaction.",
+        "Buy shares of a stock, pre-IPO company, or ETF using USDC. The user must confirm the purchase. Uses Circle Gateway nanopayments on Base Sepolia.",
       inputSchema: z.object({
         symbol: z
           .string()
-          .describe(
-            "Ticker symbol to buy (e.g. AAPL, TSLA, SPACEX, SPY)"
-          ),
+          .describe("Ticker symbol to buy, e.g. AAPL, TSLA, SPACEX, SPY"),
         shares: z
           .string()
-          .describe("Number of shares to buy (e.g. '1', '0.5', '2')"),
+          .describe("Number of shares to buy, e.g. '1', '0.5', '2'"),
       }),
       execute: async ({ symbol, shares }) => {
         if (!userId) return { error: "Not authenticated" };
         const sym = symbol.toUpperCase();
-        const market = INVESTMENT_OPTIONS[sym];
-        if (!market) {
+        const asset = DEMO_ASSETS.find((a) => a.symbol === sym);
+
+        if (!asset) {
           return {
-            error: `Unknown symbol: ${sym}. Available: ${Object.keys(INVESTMENT_OPTIONS).join(", ")}`,
+            error: `Unknown symbol: ${sym}. Use get_investments to see available assets.`,
           };
         }
-        if (!market.available) return { error: `${sym} is not available for purchase` };
 
         const sharesNum = Number(shares);
-        if (isNaN(sharesNum) || sharesNum <= 0)
+        if (isNaN(sharesNum) || sharesNum <= 0) {
           return { error: "Invalid number of shares" };
+        }
 
-        const totalUsdc = (sharesNum * market.currentPriceUsd).toFixed(6);
+        const totalUsdc = (sharesNum * asset.priceUsd).toFixed(6);
         let txHash: string | null = null;
-        let paymentStatus = "completed";
 
-        // Attempt real payment if key available
         if (process.env.CIRCLE_BUYER_PRIVATE_KEY) {
           try {
             const { getBuyerClient } = await import("@/lib/circle-gateway");
             const client = getBuyerClient();
-            const resourceUrl = `https://invest.bottie.app/${sym}/${sharesNum}`;
-            const result = await (client as any).pay?.(resourceUrl).catch(() => null);
+            const base =
+              process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+            const result = await client.pay(`${base}/api/nanopay/sell`);
             txHash = result?.transaction ?? null;
           } catch {
-            // Fall through to simulation
+            // simulation mode
           }
         }
 
-        try {
-          // Check for existing position
-          const existing = await db
-            .select()
-            .from(investments)
-            .where(and(eq(investments.userId, userId), eq(investments.symbol, sym)));
-
-          if (existing.length > 0) {
-            // Update existing position with weighted avg price
-            const pos = existing[0];
-            const oldShares = Number(pos.shares);
-            const oldAvg = Number(pos.avgPriceUsd);
-            const newShares = oldShares + sharesNum;
-            const newAvg = (oldShares * oldAvg + sharesNum * market.currentPriceUsd) / newShares;
-
-            await db
-              .update(investments)
-              .set({
-                shares: newShares.toFixed(8),
-                avgPriceUsd: newAvg.toFixed(6),
-                updatedAt: new Date(),
-              })
-              .where(eq(investments.id, pos.id));
-          } else {
-            await db.insert(investments).values({
-              userId,
-              symbol: sym,
-              name: market.name,
-              type: market.type,
-              shares: sharesNum.toFixed(8),
-              avgPriceUsd: market.currentPriceUsd.toFixed(6),
-            });
-          }
-
-          const [payment] = await db
-            .insert(payments)
-            .values({
-              userId,
-              type: "investment",
-              referenceId: sym,
-              description: `Bought ${shares} shares of ${market.name} (${sym})`,
-              amountUsdc: totalUsdc,
-              status: paymentStatus,
-              txHash,
-            })
-            .returning();
-
-          return {
-            success: true,
-            message: `Bought ${shares} shares of ${market.name} (${sym}) for $${totalUsdc} USDC`,
-            symbol: sym,
-            shares,
-            pricePerShare: market.currentPriceUsd,
-            totalUsdc,
-            paymentId: payment.id,
+        const [payment] = await db
+          .insert(payments)
+          .values({
+            userId,
+            type: "investment",
+            referenceId: sym,
+            description: `Bought ${shares} shares of ${asset.name} (${sym})`,
+            amountUsdc: totalUsdc,
+            status: "completed",
             txHash,
-            simulated: !txHash,
-          };
-        } catch (err: any) {
-          return { error: err?.message || "Investment purchase failed" };
-        }
+          })
+          .returning();
+
+        return {
+          success: true,
+          message: `Bought ${shares} shares of ${asset.name} (${sym}) for $${totalUsdc} USDC`,
+          symbol: sym,
+          shares,
+          pricePerShare: asset.priceUsd,
+          totalUsdc,
+          paymentId: payment.id,
+          usedNanopay: !!txHash,
+        };
       },
     }),
 
     get_market_prices: tool({
       description:
-        "Get current prices and details for available stocks, ETFs, and pre-IPO companies.",
+        "Get current prices and 24h change for all available stocks, ETFs, and pre-IPO companies.",
       inputSchema: z.object({
         type: z
           .enum(["stock", "ipo", "etf", "all"])
@@ -369,23 +215,20 @@ export function createTools(walletAddress?: string, userId?: string) {
           .describe("Get details for a specific symbol"),
       }),
       execute: async ({ type, symbol }) => {
-        const options = Object.entries(INVESTMENT_OPTIONS);
-        let filtered = options;
-
+        let list = DEMO_ASSETS;
         if (symbol) {
-          filtered = options.filter(([k]) => k === symbol.toUpperCase());
+          list = DEMO_ASSETS.filter((a) => a.symbol === symbol.toUpperCase());
         } else if (type && type !== "all") {
-          filtered = options.filter(([, v]) => v.type === type);
+          list = DEMO_ASSETS.filter((a) => a.type === type);
         }
-
         return {
-          assets: filtered.map(([sym, v]) => ({
-            symbol: sym,
-            name: v.name,
-            type: v.type,
-            currentPriceUsd: v.currentPriceUsd,
-            description: v.description,
-            available: v.available,
+          assets: list.map((a) => ({
+            symbol: a.symbol,
+            name: a.name,
+            type: a.type,
+            priceUsd: a.priceUsd,
+            change24h: a.change24h,
+            description: a.description,
           })),
         };
       },
@@ -411,22 +254,21 @@ export function createTools(walletAddress?: string, userId?: string) {
           const records = await db
             .select()
             .from(payments)
-            .where(
-              type
-                ? and(eq(payments.userId, userId), eq(payments.type, type))
-                : eq(payments.userId, userId)
-            )
+            .where(eq(payments.userId, userId))
             .orderBy(desc(payments.createdAt))
             .limit(cap);
 
+          const filtered = type
+            ? records.filter((p) => p.type === type)
+            : records;
+
           return {
-            payments: records.map((p) => ({
+            payments: filtered.map((p) => ({
               id: p.id,
               type: p.type,
               description: p.description,
               amountUsdc: p.amountUsdc,
               status: p.status,
-              txHash: p.txHash,
               createdAt: p.createdAt,
             })),
           };
@@ -440,7 +282,7 @@ export function createTools(walletAddress?: string, userId?: string) {
 
     get_nanopay_balance: tool({
       description:
-        "Check the agent's Circle Gateway nanopayments balance on Base Sepolia — both the wallet USDC balance and the spendable Gateway balance for gas-free payments",
+        "Check the agent's Circle Gateway nanopayments balance on Base Sepolia — both the wallet USDC balance and the spendable Gateway balance for gas-free payments.",
       inputSchema: z.object({}),
       execute: async () => {
         const base = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
@@ -452,11 +294,11 @@ export function createTools(walletAddress?: string, userId?: string) {
 
     nanopay_deposit: tool({
       description:
-        "Deposit USDC from the agent wallet into the Circle Gateway balance so it can make gas-free nanopayments. Use this before making payments.",
+        "Deposit USDC from the agent wallet into the Circle Gateway balance so it can make gas-free nanopayments.",
       inputSchema: z.object({
         amount: z
           .string()
-          .describe("Amount of USDC to deposit (e.g. '1' for 1 USDC)"),
+          .describe("Amount of USDC to deposit, e.g. '1' for 1 USDC"),
       }),
       execute: async ({ amount }) => {
         const base = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
@@ -475,7 +317,7 @@ export function createTools(walletAddress?: string, userId?: string) {
 
     nanopay_pay: tool({
       description:
-        "Pay for an x402-protected API or content using Circle Gateway nanopayments (gas-free USDC). Provide the full URL of the resource to pay for.",
+        "Pay for an x402-protected resource using Circle Gateway nanopayments (gas-free USDC). Provide the full URL of the resource.",
       inputSchema: z.object({
         url: z
           .string()
@@ -503,7 +345,7 @@ export function createTools(walletAddress?: string, userId?: string) {
       inputSchema: z.object({
         amount: z
           .string()
-          .describe("Amount of USDC to withdraw (e.g. '0.5' for 0.5 USDC)"),
+          .describe("Amount of USDC to withdraw, e.g. '0.5' for 0.5 USDC"),
       }),
       execute: async ({ amount }) => {
         const base = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";

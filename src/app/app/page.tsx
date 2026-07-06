@@ -7,7 +7,9 @@ import { DemoStateProvider, useDemoState } from "@/contexts/demo-state-context";
 import { BillsScreen } from "@/components/dashboard/bills-screen";
 import { InvestmentsScreen } from "@/components/dashboard/investments-screen";
 import { PaymentsScreen } from "@/components/dashboard/payments-screen";
-import { DEMO_BILLS, DEMO_ASSETS, ASSET_PRICES } from "@/lib/demo-data";
+import { FundWalletSheet } from "@/components/dashboard/fund-wallet-sheet";
+import { useUsdcBalance, LOW_BALANCE_THRESHOLD_USD } from "@/hooks/use-usdc-balance";
+import { DEMO_BILLS, ASSET_PRICES } from "@/lib/demo-data";
 
 type Tab = "bills" | "investments" | "payments" | "chat";
 
@@ -20,8 +22,14 @@ const TABS: { key: Tab; label: string; icon: string }[] = [
 
 function DashboardInner() {
   const { openSidebar, open: openChat } = useChatSheet();
+  const { user } = usePrivy();
   const [activeTab, setActiveTab] = useState<Tab>("bills");
+  const [showFundSheet, setShowFundSheet] = useState(false);
   const { paidBillIds, portfolio } = useDemoState();
+
+  const agentAddress = user?.wallet?.address as `0x${string}` | undefined;
+  const { balance: usdcBalance, isLow: balanceIsLow, formatted: balanceFormatted } =
+    useUsdcBalance(agentAddress);
 
   const handleTabClick = (tab: Tab) => {
     if (tab === "chat") {
@@ -78,9 +86,36 @@ function DashboardInner() {
         </button>
       </div>
 
+      {/* Low-balance banner */}
+      {balanceIsLow && agentAddress && (
+        <div className="fixed top-[calc(env(safe-area-inset-top)+56px)] left-0 right-0 z-20 mx-5 mt-1">
+          <div className="flex items-center justify-between rounded-xl bg-amber-900/30 border border-amber-700/40 px-4 py-2.5">
+            <div className="flex items-center gap-2 text-sm text-amber-400">
+              <span>⚠</span>
+              <span className="font-medium">
+                Low balance ({balanceFormatted}) — payments may fail
+              </span>
+            </div>
+            <button
+              onClick={() => setShowFundSheet(true)}
+              className="shrink-0 rounded-lg bg-amber-400 px-3 py-1 text-xs font-semibold text-[#141513]"
+            >
+              Add Funds
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Summary strip */}
-      <div className="mt-[calc(env(safe-area-inset-top)+56px)] px-5 pb-2 pt-2">
+      <div
+        className={`px-5 pb-2 pt-2 ${
+          balanceIsLow && agentAddress
+            ? "mt-[calc(env(safe-area-inset-top)+100px)]"
+            : "mt-[calc(env(safe-area-inset-top)+56px)]"
+        }`}
+      >
         <div className="flex gap-3">
+          {/* Bills card */}
           <div className="flex-1 rounded-2xl bg-[#1B1C19] border border-[#2A2B27] p-4">
             <p className="text-xs text-[#A7A79A] font-medium">Monthly Bills</p>
             <p className="text-xl font-bold text-[#F2F0E8] mt-0.5">
@@ -90,6 +125,8 @@ function DashboardInner() {
               <p className="text-xs text-amber-400 mt-0.5">{pendingCount} not subscribed</p>
             )}
           </div>
+
+          {/* Portfolio card */}
           <div className="flex-1 rounded-2xl bg-[#1B1C19] border border-[#2A2B27] p-4">
             <p className="text-xs text-[#A7A79A] font-medium">Portfolio</p>
             <p className="text-xl font-bold text-[#F2F0E8] mt-0.5">
@@ -99,6 +136,27 @@ function DashboardInner() {
               {portfolio.length} position{portfolio.length !== 1 ? "s" : ""}
             </p>
           </div>
+
+          {/* Wallet balance card */}
+          {agentAddress && (
+            <div
+              className="w-[88px] shrink-0 cursor-pointer rounded-2xl border p-4 flex flex-col justify-between transition-colors hover:border-[#8FAE82]/50"
+              style={{
+                background: "#1B1C19",
+                borderColor: balanceIsLow ? "rgba(251,191,36,0.4)" : "#2A2B27",
+              }}
+              onClick={() => setShowFundSheet(true)}
+            >
+              <p className="text-[10px] text-[#A7A79A] font-medium leading-tight">Wallet</p>
+              <p
+                className="text-sm font-bold mt-1 leading-tight"
+                style={{ color: balanceIsLow ? "#fbbf24" : "#F2F0E8" }}
+              >
+                {balanceFormatted}
+              </p>
+              <p className="text-[10px] text-[#8FAE82] mt-1">+ Add</p>
+            </div>
+          )}
         </div>
       </div>
 
@@ -126,6 +184,14 @@ function DashboardInner() {
         {activeTab === "investments" && <InvestmentsScreen />}
         {activeTab === "payments"    && <PaymentsScreen />}
       </div>
+
+      {/* Fund wallet sheet */}
+      {showFundSheet && agentAddress && (
+        <FundWalletSheet
+          agentAddress={agentAddress}
+          onClose={() => setShowFundSheet(false)}
+        />
+      )}
     </div>
   );
 }

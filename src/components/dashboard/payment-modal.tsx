@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect } from "react";
+import { useState, useEffect } from "react";
+import { arcKit, AGENT_CHAIN } from "@/lib/arc-kit";
+import { createViemAdapterFromProvider } from "@circle-fin/adapter-viem-v2";
 import { useWriteContract, useWaitForTransactionReceipt } from "wagmi";
 import { parseUnits } from "viem";
 
@@ -19,6 +21,19 @@ const TRANSFER_ABI = [
     stateMutability: "nonpayable",
   },
 ] as const;
+
+function useFirstBrowserWallet() {
+  const [provider, setProvider] = useState<any>(null);
+  useEffect(() => {
+    const handler = (e: any) => {
+      setProvider((prev: any) => prev ?? e.detail.provider);
+    };
+    window.addEventListener("eip6963:announceProvider", handler);
+    window.dispatchEvent(new Event("eip6963:requestProvider"));
+    return () => window.removeEventListener("eip6963:announceProvider", handler);
+  }, []);
+  return provider;
+}
 
 interface PaymentModalProps {
   title: string;
@@ -39,11 +54,16 @@ export function PaymentModal({
   onSuccess,
   onClose,
 }: PaymentModalProps) {
+  const browserProvider = useFirstBrowserWallet();
+  const [arcPending, setArcPending] = useState(false);
+  const [arcError, setArcError] = useState<string | null>(null);
+
+  // wagmi fallback (used when no EIP-6963 browser wallet is present)
   const {
     writeContract,
     data: txHash,
     isPending,
-    error,
+    error: wagmiError,
     reset,
   } = useWriteContract();
 
@@ -56,7 +76,39 @@ export function PaymentModal({
     }
   }, [isConfirmed, txHash, onSuccess]);
 
-  const handlePay = () => {
+  const handlePay = async () => {
+    setArcError(null);
+
+    if (browserProvider) {
+      // Arc AppKit send path — preferred when browser wallet available
+      setArcPending(true);
+      try {
+        const adapter = await createViemAdapterFromProvider({ provider: browserProvider });
+        const result = await arcKit.send({
+          from: { adapter, chain: AGENT_CHAIN },
+          to: RECEIVER,
+          amount: amount.toFixed(6),
+          token: "USDC",
+        });
+        const hash =
+          (result as any)?.hash ??
+          (result as any)?.transactionHash ??
+          `arc-${Date.now()}`;
+        onSuccess(hash);
+      } catch (err: any) {
+        const msg = (err?.message ?? "").toLowerCase();
+        setArcError(
+          msg.includes("reject") || msg.includes("cancel") || msg.includes("denied")
+            ? "Payment cancelled."
+            : "Payment could not be processed. Please try again.",
+        );
+      } finally {
+        setArcPending(false);
+      }
+      return;
+    }
+
+    // wagmi fallback
     reset();
     writeContract({
       address: USDC_CONTRACT,
@@ -66,17 +118,19 @@ export function PaymentModal({
     });
   };
 
-  const isBusy = isPending || isConfirming;
+  const isBusy = arcPending || isPending || isConfirming;
 
   let btnLabel = ctaLabel ?? `Pay $${amount.toFixed(2)}`;
-  if (isPending) btnLabel = "Confirm in wallet…";
+  if (arcPending || isPending) btnLabel = "Confirm in wallet…";
   if (isConfirming) btnLabel = "Processing payment…";
 
-  const friendlyError = error
-    ? error.message?.includes("User rejected")
-      ? "Payment cancelled."
-      : "Payment could not be processed. Please try again."
-    : null;
+  const friendlyError =
+    arcError ??
+    (wagmiError
+      ? wagmiError.message?.includes("User rejected")
+        ? "Payment cancelled."
+        : "Payment could not be processed. Please try again."
+      : null);
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm">

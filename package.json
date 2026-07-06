@@ -10,6 +10,8 @@
   "dependencies": {
     "@ai-sdk/deepseek": "^2.0.24",
     "@ai-sdk/react": "^3.0.118",
+    "@circle-fin/adapter-viem-v2": "^1.12.1",
+    "@circle-fin/app-kit": "^1.8.1",
     "@circle-fin/x402-batching": "^3.2.0",
     "@neondatabase/serverless": "^1.0.2",
     "@privy-io/react-auth": "^3.17.0",
