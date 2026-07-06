@@ -10,6 +10,7 @@ import { PaymentsScreen } from "@/components/dashboard/payments-screen";
 import { FundWalletSheet } from "@/components/dashboard/fund-wallet-sheet";
 import { useUsdcBalance, LOW_BALANCE_THRESHOLD_USD } from "@/hooks/use-usdc-balance";
 import { DEMO_BILLS, ASSET_PRICES } from "@/lib/demo-data";
+import { getUserFirstName } from "@/lib/user-display-name";
 
 type Tab = "bills" | "investments" | "payments" | "chat";
 
@@ -30,6 +31,7 @@ function DashboardInner() {
   const agentAddress = user?.wallet?.address as `0x${string}` | undefined;
   const { balance: usdcBalance, isLow: balanceIsLow, formatted: balanceFormatted } =
     useUsdcBalance(agentAddress);
+  const firstName = getUserFirstName(user);
 
   const handleTabClick = (tab: Tab) => {
     if (tab === "chat") {
@@ -114,6 +116,10 @@ function DashboardInner() {
             : "mt-[calc(env(safe-area-inset-top)+56px)]"
         }`}
       >
+        <p className="mb-3 text-lg font-semibold text-[#F2F0E8]">
+          Hey{firstName ? `, ${firstName}` : ""} 👋
+        </p>
+
         <div className="flex gap-3">
           {/* Bills card */}
           <div className="flex-1 rounded-2xl bg-[#1B1C19] border border-[#2A2B27] p-4">

@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import type { ReactNode } from "react";
 import { formatUsd } from "@/lib/format";
+import { getUserFirstName } from "@/lib/user-display-name";
 
 interface SettingsSidebarProps {
   open: boolean;
@@ -61,9 +62,8 @@ export function SettingsSidebar({
 
   const walletAddress = user?.smartWallet?.address ?? user?.wallet?.address;
   const email = user?.email?.address || user?.google?.email;
-  const displayName =
-    user?.google?.name || (user?.apple as { name?: string } | undefined)?.name || email || "User";
-  const initial = displayName.charAt(0).toUpperCase();
+  const firstName = getUserFirstName(user) ?? "User";
+  const initial = firstName.charAt(0).toUpperCase();
 
   return (
     <motion.div
@@ -81,7 +81,7 @@ export function SettingsSidebar({
         </div>
         <div className="min-w-0 flex-1">
           <p className="truncate font-display text-lg text-cream">
-            {displayName.split(" ")[0]}
+            {firstName}
           </p>
           {email && (
             <p className="truncate font-mono text-[10px] text-cream/50">

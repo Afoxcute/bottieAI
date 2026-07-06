@@ -5,6 +5,7 @@ import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { usePrivy } from "@privy-io/react-auth";
 import { useChatSheet } from "@/contexts/chat-context";
+import { getUserFirstName } from "@/lib/user-display-name";
 import { MessageBubble } from "./message-bubble";
 import { ThinkingIndicator } from "./thinking-indicator";
 import { ToolApprovalCard } from "./tool-approval-card";
@@ -28,10 +29,7 @@ export function ChatSheet({ visible }: ChatSheetProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const userScrolledRef = useRef(false);
 
-  const name =
-    user?.google?.name?.split(" ")[0] ||
-    (user?.apple as { firstName?: string } | undefined)?.firstName ||
-    undefined;
+  const name = getUserFirstName(user);
 
   const walletAddress = user?.smartWallet?.address ?? user?.wallet?.address;
 
