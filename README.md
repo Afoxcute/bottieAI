@@ -111,7 +111,6 @@ await arcKit.bridge({
 
 ---
 
-## Demo data
 
 **Bills** (`src/lib/demo-data.ts`) — 16 pre-loaded:
 
